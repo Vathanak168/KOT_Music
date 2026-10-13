@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: kot-music
+    env: docker
+    plan: free
+    region: singapore
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production

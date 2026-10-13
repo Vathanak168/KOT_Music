@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0D17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="KOT Music">
+  <title>KOT Music - ចាក់ចម្រៀងលើ Lock Screen គ្មានពាណិជ្ជកម្ម (Ad-Free Background Audio)</title>
+  <meta name="description" content="កម្មវិធីចាក់ចម្រៀង YouTube ឥតគិតថ្លៃ គ្មានផ្ទាំងពាណិជ្ជកម្ម ១០០% ចាក់បន្តពេលបិទអេក្រង់ទូរស័ព្ទ (Lock Screen) បានយ៉ាងរលូន។">
+
+  <!-- Favicon & PWA Manifest -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- Google Fonts: Kantumruy Pro (Khmer) + Outfit & Plus Jakarta Sans (English) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/style.css?v=ios_lockscreen_v6">
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="ambient-glow glow-1" aria-hidden="true"></div>
+  <div class="ambient-glow glow-2" aria-hidden="true"></div>
+  <div class="ambient-glow glow-3" aria-hidden="true"></div>
+
+  <!-- Hardware Native Audio Player (iOS WebKit & Android Background Playback) -->
+  <audio id="audioPlayer" preload="auto" playsinline webkit-playsinline="true" x-webkit-airplay="allow"></audio>
+  <!-- Companion iOS Background Session Keep-Alive Loop -->
+  <audio id="silentKeepAlive" src="/silent.mp3" preload="auto" loop playsinline webkit-playsinline="true" style="display:none;"></audio>
+
+  <div class="app-layout">
+    <!-- Header Navigation -->
+    <!-- Header Navigation (YouTube Minimalism: Brand on left, Clean Action Icons on right) -->
+    <header class="app-header">
+      <div class="header-left">
+        <a href="/" class="brand-logo" id="brandLogoLink">
+          <div class="logo-icon-wrap">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+            <span class="live-pulse"></span>
+          </div>
+          <span class="brand-name">KOT <span class="gradient-text">MUSIC</span></span>
+        </a>
+      </div>
+
+      <div class="header-right">
+        <button id="btnPhoneConnect" class="btn-header-icon" title="បើកលើទូរស័ព្ទ (QR Code)" aria-label="Connect Phone">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/>
+          </svg>
+        </button>
+
+        <button id="btnSoundFxHeader" class="btn-header-icon" title="Sound FX (Bose & TikTok DSP)" aria-label="Sound FX">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+          <span class="header-fx-indicator"></span>
+        </button>
+
+        <button id="btnQueueToggle" class="btn-header-icon" title="បញ្ជីចម្រៀង (Queue)" aria-label="Open Queue">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <circle cx="4" cy="6" r="1.5" fill="currentColor"></circle>
+            <circle cx="4" cy="12" r="1.5" fill="currentColor"></circle>
+            <circle cx="4" cy="18" r="1.5" fill="currentColor"></circle>
+          </svg>
+          <span id="queueBadgeCount" class="header-badge hidden">0</span>
+        </button>
+
+        <button id="btnFavToggle" class="hidden" aria-hidden="true"></button>
+        <span id="favBadgeCount" class="hidden" aria-hidden="true"></span>
+        <button id="btnInstallPwa" class="hidden" aria-hidden="true"></button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-main" id="mainContainer">
+      <!-- Sleek Compact Search Box (YouTube Style) -->
+      <section class="search-section-wrap">
+        <form id="searchForm" class="search-form" autocomplete="off" onsubmit="return false;">
+          <div class="search-input-box">
+            <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input 
+              type="text" 
+              id="searchInput" 
+              placeholder="ស្វែងរកបទចម្រៀង ឬ paste YouTube link..." 
+              aria-label="Search music or paste YouTube link"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" id="btnSearchClear" class="btn-clear hidden" aria-label="Clear search">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <button type="submit" id="btnSearchSubmit" class="btn-search-action" aria-label="Submit Search">
+              <span class="btn-text">ស្វែងរក</span>
+              <div class="btn-spinner hidden" id="searchSpinner"></div>
+            </button>
+          </div>
+        </form>
+
+        <!-- Autocomplete Dropdown List -->
+        <ul id="suggestionsList" class="suggestions-dropdown hidden" role="listbox"></ul>
+      </section>
+
+      <!-- YouTube Filter Chips: Single Horizontal Edge-to-Edge Scroll Row -->
+      <nav class="filter-chips-nav" aria-label="Categories">
+        <div class="category-chips-scroll" role="tablist">
+          <button class="chip-item active" data-cat="khmer" id="tabKhmer" role="tab" aria-selected="true">
+            🇰🇭 ចម្រៀងខ្មែរ
+          </button>
+          <button class="chip-item" data-cat="chill" id="tabChill" role="tab" aria-selected="false">
+            ☕ Chill &amp; Lo-Fi
+          </button>
+          <button class="chip-item" data-cat="pop" id="tabPop" role="tab" aria-selected="false">
+            🔥 Pop Hits
+          </button>
+          <button class="chip-item" data-cat="sleep" id="tabSleep" role="tab" aria-selected="false">
+            🌙 Deep Sleep
+          </button>
+          <button class="chip-item" data-cat="edm" id="tabEdm" role="tab" aria-selected="false">
+            ⚡ Cyber EDM
+          </button>
+        </div>
+      </nav>
+
+      <!-- Music Section Header & Active View -->
+      <section class="songs-section">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <h2 id="sectionTitle" class="section-title">🇰🇭 ចម្រៀងខ្មែរពេញនិយម</h2>
+            <span id="songsCountBadge" class="section-count">កំពុងដំណើរការ...</span>
+          </div>
+
+          <div class="section-actions">
+            <button id="btnPlayAll" class="btn-pill-action" title="ចាក់ទាំងអស់">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>ចាក់ទាំងអស់</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Songs Grid (Immediate Content) -->
+        <div id="songsGrid" class="songs-grid" role="region" aria-label="Song list">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <!-- Empty & Error State Container -->
+        <div id="statusState" class="status-state hidden">
+          <div class="status-icon" id="statusIcon">🔍</div>
+          <h3 id="statusTitle" class="status-title">មិនមានលទ្ធផល</h3>
+          <p id="statusDesc" class="status-desc">សូមសាកល្បងស្វែងរកឈ្មោះចម្រៀងផ្សេងទៀត។</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Side Drawer: Queue / Playlist -->
+    <aside id="queueDrawer" class="side-drawer hidden" aria-label="Music Queue">
+      <div class="drawer-header">
+        <div class="drawer-title-wrap">
+          <h3 class="drawer-title">បញ្ជីចម្រៀងបន្ទាប់ (Queue)</h3>
+          <span id="queueTotalCount" class="drawer-badge">0 បទ</span>
+        </div>
+        <div class="drawer-controls">
+          <button id="btnClearQueue" class="btn-text-action" title="សម្អាតបញ្ជី">សម្អាត</button>
+          <button id="btnCloseQueue" class="btn-icon" aria-label="Close Queue">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div id="queueList" class="drawer-content">
+        <!-- Rendered by JS -->
+      </div>
+    </aside>
+
+    <!-- Side Drawer: Favorites / Liked Songs -->
+    <aside id="favDrawer" class="side-drawer hidden" aria-label="Favorites List">
+      <div class="drawer-header">
+        <div class="drawer-title-wrap">
+          <h3 class="drawer-title">ចម្រៀងចូលចិត្ត (Favorites)</h3>
+          <span id="favTotalCount" class="drawer-badge">0 បទ</span>
+        </div>
+        <div class="drawer-controls">
+          <button id="btnCloseFav" class="btn-icon" aria-label="Close Favorites">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div id="favList" class="drawer-content">
+        <!-- Rendered by JS -->
+      </div>
+    </aside>
+
+    <!-- Backdrop for Drawers -->
+    <div id="drawerOverlay" class="drawer-overlay hidden"></div>
+
+    <!-- Floating Docked Bottom Mini Player -->
+    <div id="miniPlayer" class="mini-player hidden" aria-label="Mini Player">
+      <!-- Top Scrubber progress line -->
+      <div class="mini-progress-track" id="miniProgressTrack">
+        <div class="mini-progress-fill" id="miniProgressFill"></div>
+      </div>
+
+      <div class="mini-player-body">
+        <!-- Left: Song Artwork & Details -->
+        <div class="mini-track-info" id="btnOpenFullPlayer">
+          <div class="mini-art-wrap">
+            <img id="miniTrackArt" src="/favicon.svg" alt="Cover" class="mini-track-art">
+            <div class="mini-playing-anim" id="miniPlayingAnim">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="mini-text-wrap">
+            <div id="miniTrackTitle" class="mini-track-title">មិនទាន់ចាក់បទចម្រៀង</div>
+            <div id="miniTrackArtist" class="mini-track-artist">KOT Music</div>
+          </div>
+        </div>
+
+        <!-- Center: Controls -->
+        <div class="mini-controls">
+          <button id="btnMiniPrev" class="ctrl-btn" title="បទមុន (Previous)" aria-label="Previous track">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <polygon points="19 20 9 12 19 4 19 20"></polygon>
+              <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"></line>
+            </svg>
+          </button>
+
+          <button id="btnMiniPlay" class="ctrl-btn-play" title="ចាក់ / ផ្អាក (Play/Pause)" aria-label="Play/Pause">
+            <svg id="iconMiniPlay" class="ctrl-icon-play" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <svg id="iconMiniPause" class="ctrl-icon-pause hidden" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+          </button>
+
+          <button id="btnMiniNext" class="ctrl-btn" title="បទបន្ទាប់ (Next)" aria-label="Next track">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <polygon points="5 4 15 12 5 20 5 4"></polygon>
+              <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Right: Sound FX, Like & Expand -->
+        <div class="mini-tools">
+          <button id="btnOpenSoundFxMini" class="ctrl-btn-tool" title="TikTok &amp; Bose Sound FX" aria-label="Sound Engine">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+            </svg>
+          </button>
+          <button id="btnMiniFav" class="ctrl-btn-tool" title="ចូលចិត្ត (Favorite)" aria-label="Add to favorites">
+            <svg id="iconMiniFav" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </button>
+          <button id="btnExpandPlayer" class="ctrl-btn-tool" title="ពង្រីកផ្ទាំងចាក់ (Maximize)" aria-label="Expand player">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <polyline points="9 21 3 21 3 15"></polyline>
+              <line x1="21" y1="3" x2="14" y2="10"></line>
+              <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Bottom Navigation Bar (Spotify / Apple Music Style) -->
+    <nav class="bottom-nav-bar" id="bottomNavBar" aria-label="Mobile Navigation">
+      <button class="nav-item active" data-nav="home" id="navHome" aria-label="Home">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
+        <span>ទំព័រដើម</span>
+      </button>
+
+      <button class="nav-item" data-nav="search" id="navSearch" aria-label="Search">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span>ស្វែងរក</span>
+      </button>
+
+      <button class="nav-item nav-item-special" data-nav="soundfx" id="navSoundFx" aria-label="TikTok and Bose Sound FX">
+        <div class="nav-fx-glow"></div>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        </svg>
+        <span>Sound FX</span>
+      </button>
+
+      <button class="nav-item" data-nav="favorites" id="navFav" aria-label="Favorites">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+        <span id="navFavBadge" class="nav-badge hidden">0</span>
+        <span>ចូលចិត្ត</span>
+      </button>
+
+      <button class="nav-item" data-nav="queue" id="navQueue" aria-label="Queue">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2">
+          <line x1="8" y1="6" x2="21" y2="6"></line>
+          <line x1="8" y1="12" x2="21" y2="12"></line>
+          <line x1="8" y1="18" x2="21" y2="18"></line>
+          <circle cx="4" cy="6" r="1.5" fill="currentColor"></circle>
+          <circle cx="4" cy="12" r="1.5" fill="currentColor"></circle>
+          <circle cx="4" cy="18" r="1.5" fill="currentColor"></circle>
+        </svg>
+        <span id="navQueueBadge" class="nav-badge hidden">0</span>
+        <span>បញ្ជី</span>
+      </button>
+    </nav>
+
+    <!-- Fullscreen Player Modal / Sheet (Native Mobile Bottom Sheet) -->
+    <div id="fullPlayerModal" class="full-player-modal hidden" aria-modal="true" role="dialog" aria-label="Full Music Player">
+      <!-- Blurred Ambient Background Cover -->
+      <div id="fullPlayerBackdrop" class="full-player-backdrop"></div>
+
+      <div class="full-player-container">
+        <!-- Native Mobile Pull Down Handle -->
+        <div class="sheet-drag-handle" id="sheetDragHandle" aria-label="Swipe down to minimize">
+          <span class="drag-bar"></span>
+        </div>
+
+        <!-- Full Player Header -->
+        <div class="full-header">
+          <button id="btnCloseFullPlayer" class="btn-icon" aria-label="Minimize Player">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <div class="full-header-title">
+            <span>កំពុងចាក់ចម្រៀង</span>
+            <span class="full-status-pill">🔒 Lock Screen Active</span>
+          </div>
+          <button id="btnFullQueueToggle" class="btn-icon" title="មើលបញ្ជី Queue" aria-label="Open Queue">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="8" y1="6" x2="21" y2="6"></line>
+              <line x1="8" y1="12" x2="21" y2="12"></line>
+              <line x1="8" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Center Stage: Vinyl & Artwork -->
+        <div class="full-art-stage">
+          <div class="art-glow-ring" id="artGlowRing"></div>
+          <div class="vinyl-disc-wrap" id="vinylDiscWrap">
+            <div class="vinyl-grooves"></div>
+            <img id="fullTrackArt" src="/favicon.svg" alt="Album Cover" class="full-album-art">
+            <div class="vinyl-center-pin"></div>
+          </div>
+        </div>
+
+        <!-- Real-time Audio Spectrum Visualizer -->
+        <div class="visualizer-container">
+          <canvas id="visualizerCanvas" width="340" height="48"></canvas>
+        </div>
+
+        <!-- Sound FX Quick Pill in Full Player -->
+        <div class="full-soundfx-pill-wrap">
+          <button id="btnOpenSoundFxFull" class="full-soundfx-pill" title="បើកមុខងារសម្លេង TikTok &amp; Bose">
+            <span class="pill-dot"></span>
+            <span class="pill-icon">🎧</span>
+            <span>Sound FX: <strong id="fullFxModeText">Bose Master</strong></span>
+            <span class="pill-arrow">⚙️</span>
+          </button>
+        </div>
+
+        <!-- Quick Sound FX Presets Row (Thumb-Friendly Touch Row) -->
+        <div class="full-quick-presets-scroll" id="fullQuickPresetsScroll" aria-label="Quick Sound FX">
+          <button class="quick-preset-chip active" data-preset="bose">🎧 Bose Master</button>
+          <button class="quick-preset-chip" data-preset="tiktok">🔥 TikTok 808</button>
+          <button class="quick-preset-chip" data-preset="slowed">🌙 Slowed+Reverb</button>
+          <button class="quick-preset-chip" data-preset="spedup">⚡ Sped Up</button>
+          <button class="quick-preset-chip" data-preset="vocal">🎤 Vocal</button>
+          <button class="quick-preset-chip" data-preset="flat">🎚️ Flat</button>
+        </div>
+
+        <!-- Song Metadata -->
+        <div class="full-track-meta">
+          <div class="meta-text">
+            <h2 id="fullTrackTitle" class="full-title">ឈ្មោះបទចម្រៀង</h2>
+            <p id="fullTrackArtist" class="full-artist">ឈ្មោះតារាចម្រៀង</p>
+          </div>
+          <button id="btnFullFav" class="btn-fav-large" aria-label="Like song">
+            <svg id="iconFullFav" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Progress Timeline & Scrubber -->
+        <div class="full-timeline">
+          <div class="slider-wrapper">
+            <input type="range" id="seekSlider" class="seek-slider" min="0" max="100" value="0" step="0.1" aria-label="Seek track">
+            <div class="seek-fill" id="seekFill"></div>
+          </div>
+          <div class="timeline-labels">
+            <span id="timeCurrent">0:00</span>
+            <span id="timeTotal">0:00</span>
+          </div>
+        </div>
+
+        <!-- Primary Control Pad -->
+        <div class="full-controls-row">
+          <button id="btnShuffle" class="btn-ctrl-sub" title="ច្របល់ចម្រៀង (Shuffle)" aria-label="Shuffle">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 3 21 3 21 8"></polyline>
+              <line x1="4" y1="20" x2="21" y2="3"></line>
+              <polyline points="21 16 21 21 16 21"></polyline>
+              <line x1="15" y1="15" x2="21" y2="21"></line>
+              <line x1="4" y1="4" x2="9" y2="9"></line>
+            </svg>
+          </button>
+
+          <button id="btnFullPrev" class="btn-ctrl-nav" title="បទមុន" aria-label="Previous">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+              <polygon points="19 20 9 12 19 4 19 20"></polygon>
+              <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"></line>
+            </svg>
+          </button>
+
+          <button id="btnFullPlay" class="btn-ctrl-main" title="ចាក់ / ផ្អាក" aria-label="Play or pause">
+            <svg id="iconFullPlay" viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <svg id="iconFullPause" class="hidden" viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+          </button>
+
+          <button id="btnFullNext" class="btn-ctrl-nav" title="បទបន្ទាប់" aria-label="Next">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+              <polygon points="5 4 15 12 5 20 5 4"></polygon>
+              <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"></line>
+            </svg>
+          </button>
+
+          <button id="btnRepeat" class="btn-ctrl-sub" title="ចាក់សារឡើងវិញ (Repeat)" aria-label="Repeat">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="17 1 21 5 17 9"></polyline>
+              <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+              <polyline points="7 23 3 19 7 15"></polyline>
+              <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+            </svg>
+            <span id="repeatModeText" class="repeat-subtext hidden">1</span>
+          </button>
+        </div>
+
+        <!-- Volume Bar -->
+        <div class="full-volume-row">
+          <button id="btnMute" class="btn-vol-icon" aria-label="Mute toggle">
+            <svg id="iconVolHigh" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+            <svg id="iconVolMuted" class="hidden" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <line x1="23" y1="9" x2="17" y2="15"></line>
+              <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+          </button>
+          <div class="slider-wrapper vol-wrapper">
+            <input type="range" id="volumeSlider" class="seek-slider vol-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+            <div class="seek-fill" id="volFill" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- Lock Screen Tip Footer -->
+        <div class="full-footer-tip">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          ចាក់បន្តលើ Lock Screen &amp; Background ដោយស្វ័យប្រវត្តិ
+        </div>
+      </div>
+    </div>
+    <!-- TikTok & Bose DSP Sound Engine Modal -->
+    <div id="soundFxModal" class="soundfx-modal hidden" aria-modal="true" role="dialog" aria-label="TikTok &amp; Bose Sound Engine">
+      <div class="soundfx-backdrop" id="soundFxBackdrop"></div>
+      <div class="soundfx-dialog">
+        <!-- Dialog Header -->
+        <div class="soundfx-header">
+          <div class="soundfx-header-left">
+            <div class="soundfx-icon-badge">
+              <span class="fx-pulse-badge"></span>
+              🎧
+            </div>
+            <div>
+              <h3 class="soundfx-title">TikTok &amp; Bose <span class="gradient-text">Sound Engine</span></h3>
+              <p class="soundfx-subtitle">បច្ចេកវិទ្យា DSP គ្រប់គ្រងសម្លេងបែប TikTok &amp; សម្រួលកាស Bose, Sony, AirPods</p>
+            </div>
+          </div>
+          <button id="btnCloseSoundFx" class="btn-icon" aria-label="Close Sound FX">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Presets Selection Grid -->
+        <div class="soundfx-section-label">ជ្រើសរើសទម្រង់សម្លេង (Sound Profiles)</div>
+        <div class="soundfx-presets-grid" role="radiogroup" aria-label="Sound Presets">
+          <!-- Preset 1: Bose Acoustic Master -->
+          <div class="preset-card active" data-preset="bose" role="radio" aria-checked="true">
+            <div class="preset-badge">⭐️ Recommended</div>
+            <div class="preset-card-header">
+              <span class="preset-emoji">🎧</span>
+              <span class="preset-name">Bose Acoustic Master</span>
+            </div>
+            <p class="preset-desc">Sub-bass ជ្រៅណែន 3D Soundstage ទូលាយកម្រិត Audiophile ស័ក្តិសមបំផុតសម្រាប់ Bose, Sony, AirPods</p>
+            <div class="preset-tags">
+              <span>Deep Sub-Bass</span>
+              <span>3D Spatial</span>
+              <span>Audiophile EQ</span>
+            </div>
+          </div>
+
+          <!-- Preset 2: TikTok Viral Beat -->
+          <div class="preset-card" data-preset="tiktok" role="radio" aria-checked="false">
+            <div class="preset-badge hot">🔥 Trending</div>
+            <div class="preset-card-header">
+              <span class="preset-emoji">💥</span>
+              <span class="preset-name">TikTok Viral Beat</span>
+            </div>
+            <p class="preset-desc">បាសបុកខ្លាំង (Punchy 808), Dynamic Compressor ធ្វើឱ្យភ្លេងលាន់ពិរោះខ្លាំង និងមានថាមពលដូចលើ TikTok</p>
+            <div class="preset-tags">
+              <span>Punchy 808</span>
+              <span>Loud Compressor</span>
+              <span>Energy Boost</span>
+            </div>
+          </div>
+
+          <!-- Preset 3: Slowed + Reverb -->
+          <div class="preset-card" data-preset="slowed_reverb" role="radio" aria-checked="false">
+            <div class="preset-badge chill">🌌 TikTok Vibe</div>
+            <div class="preset-card-header">
+              <span class="preset-emoji">🪐</span>
+              <span class="preset-name">Slowed + Reverb</span>
+            </div>
+            <p class="preset-desc">បន្ថយល្បឿន 0.86x + បន្ថែម Reverb បន្ទប់ប្រគំតន្ត្រីដ៏ធំល្វឹងល្វើយ អន្លង់អន្លោច បែប TikTok Aesthetic</p>
+            <div class="preset-tags">
+              <span>0.86x Tempo</span>
+              <span>Concert Reverb</span>
+              <span>Nostalgic</span>
+            </div>
+          </div>
+
+          <!-- Preset 4: Sped Up (Nightcore) -->
+          <div class="preset-card" data-preset="sped_up" role="radio" aria-checked="false">
+            <div class="preset-card-header">
+              <span class="preset-emoji">⚡</span>
+              <span class="preset-name">Sped Up (TikTok Hit)</span>
+            </div>
+            <p class="preset-desc">បង្កើនល្បឿន 1.18x + សម្លេង Highs ស្រួយស្រទន់ ស្ទុះញាប់រស់រវើក ពេញនិយមក្នុងការរាំលើ TikTok</p>
+            <div class="preset-tags">
+              <span>1.18x Tempo</span>
+              <span>Crisp Shimmer</span>
+              <span>Fast Beat</span>
+            </div>
+          </div>
+
+          <!-- Preset 5: Vocal & Acoustic Clarity -->
+          <div class="preset-card" data-preset="vocal" role="radio" aria-checked="false">
+            <div class="preset-card-header">
+              <span class="preset-emoji">🎙️</span>
+              <span class="preset-name">Vocal &amp; Acoustic</span>
+            </div>
+            <p class="preset-desc">ច្រោះយកសម្លេងច្រៀងច្បាស់ថ្លា កាត់បន្ថយសម្លេងគ្រលរ ធ្វើឱ្យឧបករណ៍ភ្លេង និងសម្លេងអ្នកច្រៀងដាច់ដោយឡែកពីគ្នា</p>
+            <div class="preset-tags">
+              <span>Crisp Mid</span>
+              <span>Vocal Clarity</span>
+              <span>Acoustic</span>
+            </div>
+          </div>
+
+          <!-- Preset 6: Original (Flat) -->
+          <div class="preset-card" data-preset="flat" role="radio" aria-checked="false">
+            <div class="preset-card-header">
+              <span class="preset-emoji">🎚️</span>
+              <span class="preset-name">Original (Flat)</span>
+            </div>
+            <p class="preset-desc">សម្លេងដើមសុទ្ធពី YouTube ដោយមិនឆ្លងកាត់ការកែច្នៃ DSP ឬ EQ ឡើយ</p>
+            <div class="preset-tags">
+              <span>Raw Mix</span>
+              <span>Neutral</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom DSP Tuning Sliders -->
+        <div class="soundfx-section-label">កែសម្រួលលម្អិត (Custom Sound Tuning)</div>
+        <div class="soundfx-sliders-wrap">
+          <!-- Bass Boost -->
+          <div class="fx-slider-row">
+            <div class="fx-slider-header">
+              <span class="fx-slider-title">🔊 Bass Boost (Sub-bass &amp; 808 Punch)</span>
+              <span id="labelBassVal" class="fx-slider-val">+5 dB</span>
+            </div>
+            <input type="range" id="sliderBass" class="seek-slider fx-slider" min="0" max="14" step="1" value="5" aria-label="Bass Boost">
+          </div>
+
+          <!-- 3D Spatial Width -->
+          <div class="fx-slider-row">
+            <div class="fx-slider-header">
+              <span class="fx-slider-title">🌐 3D Spatial Audio (Stereo Width)</span>
+              <span id="labelSpatialVal" class="fx-slider-val">150%</span>
+            </div>
+            <input type="range" id="sliderSpatial" class="seek-slider fx-slider" min="50" max="220" step="5" value="150" aria-label="3D Spatial Width">
+          </div>
+
+          <!-- Reverb Wet -->
+          <div class="fx-slider-row">
+            <div class="fx-slider-header">
+              <span class="fx-slider-title">🏛️ Concert Reverb (Atmosphere)</span>
+              <span id="labelReverbVal" class="fx-slider-val">0%</span>
+            </div>
+            <input type="range" id="sliderReverb" class="seek-slider fx-slider" min="0" max="80" step="2" value="0" aria-label="Concert Reverb">
+          </div>
+
+          <!-- Playback Speed / Tempo -->
+          <div class="fx-slider-row">
+            <div class="fx-slider-header">
+              <span class="fx-slider-title">⏱️ ល្បឿនចម្រៀង (Playback Speed)</span>
+              <span id="labelSpeedVal" class="fx-slider-val">1.00x</span>
+            </div>
+            <input type="range" id="sliderSpeed" class="seek-slider fx-slider" min="0.75" max="1.35" step="0.01" value="1.00" aria-label="Playback Speed">
+          </div>
+        </div>
+
+        <!-- iOS Lock Screen Guaranteed Banner -->
+        <div id="iosModeBanner" class="soundfx-ios-banner hidden">
+          <span>🍎</span>
+          <div>
+            <strong>iPhone Lock Screen Mode:</strong> ប្រព័ន្ធបានបើកដំណើរការ Direct Hardware Audio ដោយស្វ័យប្រវត្តិ ដើម្បីធានាថាចម្រៀងចាក់បន្តជាប់ពេល Lock Screen ឬចាកចេញទៅ App ផ្សេង ១០០%!
+          </div>
+        </div>
+
+        <!-- Headphone Acoustic Note Banner -->
+        <div class="soundfx-headphone-banner">
+          <div class="headphone-icon">🎧</div>
+          <div class="headphone-text">
+            <strong>សម្រួលពិសេសសម្រាប់កាស Bose &amp; Flagship Headphones:</strong> ក្បួន DSP នេះប្រើប្រាស់ <em>Multi-Band Parametric EQ + Dynamic Range Compressor + Mid-Side 3D Spatial Widener</em> ដើម្បីរុញ Driver របស់កាស Bose (QuietComfort, Ultra, 700), Sony WH-1000XM, និង AirPods Max ឱ្យបញ្ចេញសម្លេងបាសបានជ្រៅ និងសម្លេងភ្លេងដាច់ដោយឡែកយ៉ាងពិរោះបំផុត។
+          </div>
+        </div>
+
+        <!-- Dialog Footer -->
+        <div class="soundfx-footer">
+          <button id="btnResetSoundFx" class="btn-pill-action" title="Reset Default">
+            <span>កំណត់ឡើងវិញ (Reset)</span>
+          </button>
+          <button id="btnApplySoundFx" class="btn-search-action" title="Apply Settings">
+            <span>រួចរាល់ (Apply)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phone Connect QR Code & Instructions Modal -->
+    <div id="phoneConnectModal" class="soundfx-modal hidden" aria-modal="true" role="dialog" aria-label="Connect Phone">
+      <div id="phoneConnectBackdrop" class="soundfx-backdrop"></div>
+      <div class="soundfx-dialog phone-connect-dialog">
+        <div class="soundfx-header">
+          <div class="soundfx-header-left">
+            <div class="soundfx-icon-badge phone-badge-icon">📱</div>
+            <div>
+              <h2 class="soundfx-title">បើកលើ Smart Phone</h2>
+              <p class="soundfx-subtitle">Lock Screen &amp; Ad-Free គ្មានពាណិជ្ជកម្ម ១០០%</p>
+            </div>
+          </div>
+          <button id="btnClosePhoneConnect" class="btn-icon" aria-label="Close dialog">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="phone-connect-content">
+          <div class="qr-preview-box">
+            <img id="qrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=http%3A%2F%2F192.168.25.125%3A3000&color=8B5CF6&bgcolor=0E1326" alt="QR Code" class="qr-code-img">
+            <p class="qr-tip">ស្កេនជាមួយ Camera (iPhone) ឬ Google Lens (Android)</p>
+          </div>
+
+          <div class="phone-url-card">
+            <label class="phone-url-label">អាសយដ្ឋាន Link លើទូរស័ព្ទ (Wi-Fi ជាមួយគ្នា):</label>
+            <div class="phone-url-copy-row">
+              <input type="text" id="phoneUrlInput" readonly value="http://192.168.25.125:3000" class="phone-url-input">
+              <button id="btnCopyPhoneUrl" class="btn-copy-url">
+                <span id="copyUrlText">ចម្លង Link</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="mobile-steps-list">
+            <div class="step-card">
+              <div class="step-num">1</div>
+              <div class="step-desc">
+                <strong>បើកលើ Safari (iOS) ឬ Chrome (Android)</strong>
+                <p>ត្រូវប្រាកដថាទូរស័ព្ទរបស់អ្នកភ្ជាប់ Wi-Fi តែមួយជាមួយកុំព្យូទ័រនេះ។</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-num">2</div>
+              <div class="step-desc">
+                <strong>ចាក់ចម្រៀង &amp; សាកល្បង Lock Screen</strong>
+                <p>ចុចចាក់បទណាមួយ ហើយចុចបិទអេក្រង់ទូរស័ព្ទ។ សម្លេងនឹងបន្តចាក់ដោយស្វ័យប្រវត្តិ និងឃើញផ្ទាំង Player លើ Lock Screen!</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-num">3</div>
+              <div class="step-desc">
+                <strong>បន្ថែមជា App (Add to Home Screen)</strong>
+                <p>លើ iPhone: ចុចប៊ូតុង Share 📤 រួចរើសយក <em>"Add to Home Screen"</em> ដើម្បីប្រើដូច App ពេញលេញ។</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=ios_lockscreen_v6"></script>
+</body>
+</html>
