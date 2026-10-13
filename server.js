@@ -297,8 +297,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Network info for easy mobile phone connection over Wi-Fi
+// Network info for easy mobile phone connection (LAN & Public Tunnel)
 app.get('/api/network-info', (req, res) => {
+  const host = req.get('host') || 'localhost:3000';
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const currentOrigin = `${proto}://${host}`;
+
   const nets = os.networkInterfaces();
   const results = [];
   for (const name of Object.keys(nets)) {
@@ -309,10 +313,16 @@ app.get('/api/network-info', (req, res) => {
     }
   }
   const ip = results[0] || 'localhost';
+  
+  // If accessed via public domain (Cloudflare tunnel, Render, custom domain), use that
+  const isPublicDomain = host.includes('trycloudflare.com') || host.includes('loca.lt') || host.includes('render.com') || (host.includes('.') && !host.startsWith('192.') && !host.startsWith('10.') && !host.startsWith('172.') && !host.startsWith('127.') && !host.startsWith('localhost'));
+  const mobileUrl = isPublicDomain ? currentOrigin : `http://${ip}:${PORT}`;
+
   res.json({
     ip,
     port: PORT,
-    mobileUrl: `http://${ip}:${PORT}`,
+    mobileUrl,
+    currentOrigin,
     allIps: results
   });
 });
