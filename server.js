@@ -21,6 +21,8 @@ const searchCache = new Map();
 const streamCache = new Map();
 const videoStreamCache = new Map();
 const infoCache = new Map();
+const relatedCache = new Map();
+const recommendationsCache = new Map();
 
 function setBoundedCache(cacheMap, key, value) {
   if (cacheMap.size >= MAX_CACHE_ENTRIES) {
@@ -45,6 +47,12 @@ setInterval(() => {
   }
   for (const [k, v] of videoStreamCache.entries()) {
     if (now - v.timestamp > 1000 * 60 * 60 * 2) videoStreamCache.delete(k);
+  }
+  for (const [k, v] of relatedCache.entries()) {
+    if (now - v.timestamp > 1000 * 60 * 30) relatedCache.delete(k);
+  }
+  for (const [k, v] of recommendationsCache.entries()) {
+    if (now - v.timestamp > 1000 * 60 * 30) recommendationsCache.delete(k);
   }
 }, 1000 * 60 * 15).unref();
 
@@ -531,6 +539,166 @@ app.get('/api/trending', async (req, res) => {
   } catch (err) {
     console.error('Trending fetch error:', err.message);
     res.status(500).json({ error: 'Failed to fetch curated music' });
+  }
+});
+
+// Helper: Clean title for smart search & related queries
+function cleanSearchTitle(title) {
+  if (!title) return '';
+  return title
+    .replace(/[\(\[\{].*?[\)\]\}]/g, '')
+    .replace(/official|music|video|audio|lyrics|mv|hd|4k|feat\.|ft\./gi, '')
+    .replace(/[|•–—\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// API: Related Songs (Up Next & Recommendations for currently playing song, like YouTube)
+app.get('/api/related', async (req, res) => {
+  const videoId = req.query.id;
+  const rawTitle = req.query.title || '';
+  const rawArtist = req.query.artist || '';
+
+  if (!videoId || videoId.length !== 11) {
+    return res.status(400).json({ error: 'Missing or invalid video ID ?id=' });
+  }
+
+  const cacheKey = `related_${videoId}`;
+  const cached = relatedCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < 1000 * 60 * 30) {
+    return res.json({ success: true, count: cached.data.length, data: cached.data });
+  }
+
+  try {
+    const cleanTitle = cleanSearchTitle(rawTitle);
+    const cleanArtist = rawArtist.replace(/Official|Channel|Topic|VEVO/gi, '').trim();
+
+    // Construct high-precision search query to get YouTube-like mix of related songs
+    let query = '';
+    if (cleanArtist && cleanArtist.toLowerCase() !== 'youtube' && cleanArtist.toLowerCase() !== 'artist') {
+      query = `${cleanArtist} ${cleanTitle}`;
+    } else if (cleanTitle) {
+      query = `${cleanTitle} khmer song`;
+    } else {
+      query = 'បទចម្រៀងខ្មែរពេញនិយម VannDa G-Devith';
+    }
+
+    let results = await searchYouTube(query, 18);
+
+    // If few results found, supplement with artist popular tracks
+    if (results.length < 6 && cleanArtist && cleanArtist.toLowerCase() !== 'youtube') {
+      const moreResults = await searchYouTube(`${cleanArtist} popular music`, 12);
+      results = [...results, ...moreResults];
+    }
+
+    // Exclude the current song itself
+    const filtered = results.filter(item => item.id !== videoId);
+
+    // Deduplicate by ID
+    const seen = new Set();
+    const unique = filtered.filter(item => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    }).slice(0, 16);
+
+    setBoundedCache(relatedCache, cacheKey, { data: unique, timestamp: Date.now() });
+
+    res.json({ success: true, count: unique.length, data: unique });
+
+    // Prefetch top 2 related songs in background for instant gapless next play
+    if (unique.length > 0 && unique[0]?.id) {
+      extractAudioStreamUrl(unique[0].id).catch(() => {});
+      if (unique[1]?.id) extractAudioStreamUrl(unique[1].id).catch(() => {});
+    }
+  } catch (err) {
+    console.error('Related songs error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch related songs' });
+  }
+});
+
+// API: Personalized Recommendations based on listening history & favorite artists
+app.post('/api/recommendations', async (req, res) => {
+  try {
+    const { history = [], favorites = [] } = req.body || {};
+
+    // Analyze user's favorite artists & genres
+    const artistCounts = {};
+    const playedIds = new Set();
+
+    [...history, ...favorites].forEach(song => {
+      if (!song) return;
+      if (song.id) playedIds.add(song.id);
+      let artist = (song.artist || '')
+        .replace(/Official|Channel|Topic|VEVO/gi, '')
+        .trim();
+      if (artist && artist.toLowerCase() !== 'youtube' && artist.toLowerCase() !== 'artist' && artist.length > 1) {
+        artistCounts[artist] = (artistCounts[artist] || 0) + 1;
+      }
+    });
+
+    const topArtists = Object.keys(artistCounts)
+      .sort((a, b) => artistCounts[b] - artistCounts[a])
+      .slice(0, 4);
+
+    let finalSongs = [];
+    let isPersonalized = false;
+
+    if (topArtists.length > 0) {
+      isPersonalized = true;
+      // Fetch fresh songs for each top artist in parallel
+      const searches = topArtists.map(artist => searchYouTube(`${artist} popular songs`, 8));
+      const searchResults = await Promise.allSettled(searches);
+
+      const pool = [];
+      searchResults.forEach(r => {
+        if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+          pool.push(...r.value);
+        }
+      });
+
+      // Deduplicate
+      const seen = new Set();
+      pool.forEach(song => {
+        if (!seen.has(song.id)) {
+          seen.add(song.id);
+          finalSongs.push(song);
+        }
+      });
+
+      // Shuffle slightly for organic YouTube-style feed
+      finalSongs = finalSongs.sort(() => 0.5 - Math.random()).slice(0, 20);
+    }
+
+    // Fallback or blend with curated trending if user is new or has short history
+    if (finalSongs.length < 12) {
+      const trending = await searchYouTube('បទចម្រៀងខ្មែរពេញនិយម VannDa G-Devith chill pop hits', 18);
+      const seen = new Set(finalSongs.map(s => s.id));
+      trending.forEach(s => {
+        if (!seen.has(s.id)) {
+          seen.add(s.id);
+          finalSongs.push(s);
+        }
+      });
+      finalSongs = finalSongs.slice(0, 20);
+    }
+
+    res.json({
+      success: true,
+      personalized: isPersonalized,
+      topArtists,
+      count: finalSongs.length,
+      data: finalSongs
+    });
+
+    // Prefetch top 2 songs
+    if (finalSongs.length > 0 && finalSongs[0]?.id) {
+      extractAudioStreamUrl(finalSongs[0].id).catch(() => {});
+      if (finalSongs[1]?.id) extractAudioStreamUrl(finalSongs[1].id).catch(() => {});
+    }
+  } catch (err) {
+    console.error('Recommendations error:', err.message);
+    res.status(500).json({ error: 'Failed to generate recommendations' });
   }
 });
 

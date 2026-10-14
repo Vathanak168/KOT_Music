@@ -9,9 +9,13 @@ const state = {
   isPlaying: false,
   queue: [],
   currentIndex: -1,
-  currentCategory: 'khmer',
+  currentCategory: 'recommended',
   songsList: [],
   favorites: [],
+  listenHistory: [],
+  relatedSongs: [],
+  autoplayEnabled: true,
+  userTasteArtists: [],
   repeatMode: 'all', // 'off' | 'all' | 'one'
   isShuffled: false,
   shuffledIndices: [],
@@ -22,8 +26,8 @@ const state = {
   // Scoped Vibe / Category Playback State
   activePlaybackContext: {
     type: 'category',
-    id: 'khmer',
-    name: '🇰🇭 ចម្រៀងខ្មែរ'
+    id: 'recommended',
+    name: '✨ សម្រាប់អ្នក'
   },
   activeFavFilter: 'all',
   targetSongForVibeChange: null,
@@ -37,6 +41,8 @@ const state = {
 
 // Vibe & Category Configuration
 const VIBE_CONFIG = {
+  recommended: { key: 'recommended', emoji: '✨', name: 'សម្រាប់អ្នក', title: '✨ ចម្រៀងណែនាំសម្រាប់អ្នក' },
+  history: { key: 'history', emoji: '🎧', name: 'ស្តាប់ឡើងវិញ', title: '🎧 ប្រវត្តិស្តាប់កន្លងមក' },
   khmer: { key: 'khmer', emoji: '🇰🇭', name: 'ចម្រៀងខ្មែរ', title: '🇰🇭 ចម្រៀងខ្មែរពេញនិយម' },
   chill: { key: 'chill', emoji: '☕', name: 'Chill & Lo-Fi', title: '☕ Chill & Lo-Fi Beats' },
   pop: { key: 'pop', emoji: '🔥', name: 'Pop Hits', title: '🔥 Pop Hits ពិភពលោក' },
@@ -159,6 +165,17 @@ const statusIcon = document.getElementById('statusIcon');
 const statusTitle = document.getElementById('statusTitle');
 const statusDesc = document.getElementById('statusDesc');
 
+// Recommendation & Up Next Elements (YouTube Style)
+const recommendedTasteNote = document.getElementById('recommendedTasteNote');
+const recommendedTasteText = document.getElementById('recommendedTasteText');
+const playingRelatedBanner = document.getElementById('playingRelatedBanner');
+const playingRelatedTitle = document.getElementById('playingRelatedTitle');
+const btnViewRelated = document.getElementById('btnViewRelated');
+const fullUpnextSection = document.getElementById('fullUpnextSection');
+const upnextList = document.getElementById('upnextList');
+const upnextCountBadge = document.getElementById('upnextCountBadge');
+const chkAutoplay = document.getElementById('chkAutoplay');
+
 // Drawers
 const queueDrawer = document.getElementById('queueDrawer');
 const favDrawer = document.getElementById('favDrawer');
@@ -278,6 +295,7 @@ const sheetDragHandle = document.getElementById('sheetDragHandle');
 document.addEventListener('DOMContentLoaded', () => {
   purgeLegacyLocalCategoryCache();
   loadFavorites();
+  loadListenHistory();
   setupAudioListeners();
   setupMediaSession();
   setupEventListeners();
@@ -285,8 +303,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setupYtSettings();
   registerServiceWorker();
   
-  // Load initial Khmer Trending songs
-  loadTrending('khmer');
+  // Load initial Recommended Feed for the user (YouTube style)
+  loadTrending('recommended');
 });
 
 // Auto-purge all temporary cached data on window close
@@ -1134,6 +1152,12 @@ async function playSongObject(song, addToQueueList = true) {
   // Update MediaSession immediately so iOS Lock Screen binds the song instantly
   updateMediaSessionMetadata(song);
 
+  // Save to listen history for personalized recommendations
+  saveToListenHistory(song);
+
+  // Fetch YouTube-style Up Next & Related recommendations
+  fetchRelatedSongs(song);
+
   // If in MP4 Video Mode, load and play the video
   if (state.mediaMode === 'video') {
     if (audio) audio.pause();
@@ -1225,25 +1249,41 @@ function togglePlay() {
 }
 
 function playNextTrack(isAutoNext = false) {
-  if (state.queue.length === 0) return;
+  if (state.queue.length === 0 && (!state.relatedSongs || state.relatedSongs.length === 0)) return;
 
-  if (state.isShuffled) {
+  if (state.isShuffled && state.queue.length > 0) {
     const randIndex = Math.floor(Math.random() * state.queue.length);
     state.currentIndex = randIndex;
-  } else {
-    if (state.currentIndex + 1 < state.queue.length) {
-      state.currentIndex++;
-    } else {
-      if (state.repeatMode === 'all' || !isAutoNext) {
-        state.currentIndex = 0;
-      } else {
-        return; // End of playlist
-      }
+    const nextSong = state.queue[state.currentIndex];
+    playSongObject(nextSong, false);
+    return;
+  }
+
+  // If there are more songs in current queue
+  if (state.currentIndex + 1 < state.queue.length) {
+    state.currentIndex++;
+    const nextSong = state.queue[state.currentIndex];
+    playSongObject(nextSong, false);
+    return;
+  }
+
+  // End of current queue reached: YouTube Autoplay Recommendation!
+  if (state.autoplayEnabled && state.relatedSongs && state.relatedSongs.length > 0) {
+    const nextRelated = state.relatedSongs.shift();
+    renderUpNextList();
+    if (nextRelated) {
+      playSongObject(nextRelated, true);
+      return;
     }
   }
 
-  const nextSong = state.queue[state.currentIndex];
-  playSongObject(nextSong, false);
+  if (state.repeatMode === 'all' || !isAutoNext) {
+    if (state.queue.length > 0) {
+      state.currentIndex = 0;
+      const nextSong = state.queue[state.currentIndex];
+      playSongObject(nextSong, false);
+    }
+  }
 }
 
 function playPrevTrack() {
@@ -1419,9 +1459,292 @@ function purgeLegacyLocalCategoryCache() {
   } catch(e) {}
 }
 
-async function loadTrending(category = 'khmer') {
+// =========================================================
+// History, Recommendations & Up Next Engine (YouTube Style)
+// =========================================================
+
+function loadListenHistory() {
+  try {
+    const saved = localStorage.getItem('kot_listen_history');
+    state.listenHistory = saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    state.listenHistory = [];
+  }
+
+  // Load autoplay preference
+  try {
+    const auto = localStorage.getItem('kot_autoplay');
+    state.autoplayEnabled = auto === null ? true : auto === '1';
+    if (chkAutoplay) chkAutoplay.checked = state.autoplayEnabled;
+  } catch (e) {}
+}
+
+function saveToListenHistory(song) {
+  if (!song || !song.id) return;
+  try {
+    // Remove duplicate so newest comes first
+    state.listenHistory = state.listenHistory.filter(s => s.id !== song.id);
+    state.listenHistory.unshift({
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      duration: song.duration,
+      durationFormatted: song.durationFormatted || song.duration || '3:30',
+      thumbnail: song.thumbnail,
+      playedAt: Date.now()
+    });
+    // Keep up to 50 songs in history
+    if (state.listenHistory.length > 50) {
+      state.listenHistory = state.listenHistory.slice(0, 50);
+    }
+    localStorage.setItem('kot_listen_history', JSON.stringify(state.listenHistory));
+  } catch (e) {}
+}
+
+async function loadRecommendations(forceFresh = false) {
+  hideStatusState();
+  state.currentCategory = 'recommended';
+  sectionTitle.textContent = '✨ ចម្រៀងណែនាំសម្រាប់អ្នក';
+
+  // Extract user's listening profile / frequent artists
+  const historyArtists = state.listenHistory.map(s => s.artist).filter(Boolean);
+  const favArtists = state.favorites.map(s => s.artist).filter(Boolean);
+  const artistCounts = {};
+  [...historyArtists, ...favArtists].forEach(a => {
+    const clean = a.replace(/official|channel|vevo|music|original/ig, '').trim();
+    if (clean.length >= 2) {
+      artistCounts[clean] = (artistCounts[clean] || 0) + 1;
+    }
+  });
+
+  const topArtists = Object.keys(artistCounts)
+    .sort((a, b) => artistCounts[b] - artistCounts[a])
+    .slice(0, 4);
+
+  state.userTasteArtists = topArtists;
+
+  // Update Taste Note UI
+  if (recommendedTasteNote && recommendedTasteText) {
+    if (topArtists.length > 0) {
+      recommendedTasteText.textContent = `យោងតាមបទដែលអ្នកចូលចិត្តស្តាប់ (${topArtists.slice(0, 3).join(', ')})`;
+      recommendedTasteNote.classList.remove('hidden');
+    } else {
+      recommendedTasteText.textContent = 'ផ្អែកលើបទចម្រៀងពេញនិយម & ល្បីៗប្រចាំថ្ងៃ';
+      recommendedTasteNote.classList.remove('hidden');
+    }
+  }
+
+  // Check temporary session cache
+  if (!forceFresh) {
+    const cached = getCachedCategorySongs('recommended');
+    if (cached && cached.length > 0) {
+      state.songsList = cached;
+      renderSongCards(cached);
+      songsCountBadge.textContent = `${cached.length} បទ (សម្រាប់អ្នក)`;
+      prefetchUpcomingSongs(cached);
+      return;
+    }
+  }
+
+  renderSkeletonLoading();
+  songsCountBadge.textContent = 'កំពុងវិភាគ...';
+
+  try {
+    const res = await fetch('/api/recommendations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        history: state.listenHistory.slice(0, 20),
+        favorites: state.favorites.slice(0, 20),
+        limit: 24
+      })
+    });
+    const data = await res.json();
+
+    if (data.success && data.data && data.data.length > 0) {
+      state.songsList = data.data;
+      setCachedCategorySongs('recommended', data.data);
+      renderSongCards(data.data);
+      songsCountBadge.textContent = `${data.data.length} បទ (សម្រាប់អ្នក)`;
+      prefetchUpcomingSongs(data.data);
+    } else {
+      // Fallback to trending
+      loadTrending('khmer');
+    }
+  } catch (err) {
+    console.error('Recommendations error:', err);
+    loadTrending('khmer');
+  }
+}
+
+function loadHistoryFeed() {
+  hideStatusState();
+  state.currentCategory = 'history';
+  sectionTitle.textContent = '🎧 ប្រវត្តិស្តាប់កន្លងមក';
+  if (recommendedTasteNote) recommendedTasteNote.classList.add('hidden');
+
+  if (!state.listenHistory || state.listenHistory.length === 0) {
+    songsGrid.innerHTML = '';
+    songsCountBadge.textContent = '0 បទ';
+    showStatusState('🎧', 'មិនទាន់មានប្រវត្តិស្តាប់ទេ', 'ពេលអ្នកចុចស្តាប់ចម្រៀងណាមួយ វានឹងបង្ហាញនៅទីនេះ។');
+    return;
+  }
+
+  state.songsList = state.listenHistory;
+  renderSongCards(state.listenHistory);
+  songsCountBadge.textContent = `${state.listenHistory.length} បទ`;
+}
+
+let currentRelatedFetchId = null;
+
+async function fetchRelatedSongs(song) {
+  if (!song || !song.id) return;
+  currentRelatedFetchId = song.id;
+
+  if (upnextList) {
+    upnextList.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 0.82rem;">
+        <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 6px; border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.7s linear infinite;"></span>
+        កំពុងផ្ទុកបទចម្រៀងណែនាំបន្ត...
+      </div>
+    `;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      id: song.id,
+      title: song.title || '',
+      artist: song.artist || ''
+    });
+
+    const res = await fetch(`/api/related?${params.toString()}`);
+    const data = await res.json();
+
+    if (currentRelatedFetchId !== song.id) return; // Discard stale response
+
+    if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+      state.relatedSongs = data.data.filter(s => s.id !== song.id);
+      renderUpNextList();
+      updatePlayingRelatedBanner(song);
+      prefetchUpcomingSongs(state.relatedSongs.slice(0, 3));
+    } else {
+      state.relatedSongs = [];
+      if (upnextList) {
+        upnextList.innerHTML = `<div style="padding: 14px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">មិនមានបទចម្រៀងណែនាំបន្ថែម</div>`;
+      }
+      updatePlayingRelatedBanner(song);
+    }
+  } catch (err) {
+    console.warn('Fetch related songs error:', err);
+    if (upnextList) {
+      upnextList.innerHTML = `<div style="padding: 14px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">មិនអាចផ្ទុកបទពាក់ព័ន្ធបានទេ</div>`;
+    }
+  }
+}
+
+function updatePlayingRelatedBanner(song) {
+  if (!playingRelatedBanner) return;
+  if (song && state.relatedSongs && state.relatedSongs.length > 0) {
+    if (playingRelatedTitle) {
+      const shortTitle = song.title.length > 32 ? song.title.slice(0, 32) + '...' : song.title;
+      playingRelatedTitle.textContent = `កំពុងចាក់: ${shortTitle} • មាន ${state.relatedSongs.length} បទណែនាំបន្ត`;
+    }
+    playingRelatedBanner.classList.remove('hidden');
+  } else {
+    playingRelatedBanner.classList.add('hidden');
+  }
+}
+
+function renderUpNextList() {
+  if (!upnextList) return;
+  if (!state.relatedSongs || state.relatedSongs.length === 0) {
+    upnextList.innerHTML = `<div style="padding: 14px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">មិនមានបទចម្រៀងណែនាំបន្ថែម</div>`;
+    if (upnextCountBadge) upnextCountBadge.textContent = '0 បទ';
+    return;
+  }
+
+  if (upnextCountBadge) {
+    upnextCountBadge.textContent = `${state.relatedSongs.length} បទ`;
+  }
+
+  upnextList.innerHTML = '';
+  state.relatedSongs.forEach(song => {
+    const isCurrentPlaying = state.currentSong && state.currentSong.id === song.id;
+    const card = document.createElement('div');
+    card.className = `upnext-card ${isCurrentPlaying ? 'active-playing' : ''}`;
+    card.dataset.id = song.id;
+
+    card.innerHTML = `
+      <div class="upnext-thumb-wrap">
+        <img class="upnext-thumb" src="${song.thumbnail || '/icons/icon.png'}" alt="${escapeHtml(song.title)}" loading="lazy" />
+        <span class="upnext-time">${song.durationFormatted || song.duration || '3:30'}</span>
+        <button class="upnext-play-btn" title="ចាក់ឥឡូវនេះ" aria-label="Play">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </button>
+      </div>
+      <div class="upnext-info">
+        <h4 class="upnext-song-title" title="${escapeHtml(song.title)}">${escapeHtml(song.title)}</h4>
+        <p class="upnext-song-artist">${escapeHtml(song.artist || 'YouTube Music')}</p>
+      </div>
+      <button class="upnext-add-btn" title="ដាក់ក្នុង Queue" aria-label="Add to Queue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+    `;
+
+    // Click play button: start song directly
+    const playBtn = card.querySelector('.upnext-play-btn');
+    if (playBtn) {
+      playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playSongObject(song, true);
+      });
+    }
+
+    // Click entire card to play
+    card.addEventListener('click', () => {
+      playSongObject(song, true);
+    });
+
+    // Add to queue button
+    const addBtn = card.querySelector('.upnext-add-btn');
+    if (addBtn) {
+      addBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const exists = state.queue.some(s => s.id === song.id);
+        if (!exists) {
+          state.queue.push(song);
+          updateQueueBadge();
+          renderQueueList();
+        }
+        addBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>`;
+        setTimeout(() => {
+          addBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+        }, 1500);
+      });
+    }
+
+    upnextList.appendChild(card);
+  });
+}
+
+async function loadTrending(category = 'recommended') {
   hideStatusState();
   state.currentCategory = category;
+
+  if (category === 'recommended') {
+    return loadRecommendations();
+  }
+
+  if (category === 'history') {
+    return loadHistoryFeed();
+  }
+
+  if (recommendedTasteNote) recommendedTasteNote.classList.add('hidden');
 
   const titles = {
     khmer: '🇰🇭 ចម្រៀងខ្មែរពេញនិយម',
@@ -2463,6 +2786,28 @@ function setupEventListeners() {
         playPrevTrack();
         if (navigator.vibrate) navigator.vibrate(15);
       }
+    });
+  }
+
+  // Autoplay Toggle Switch Listener (YouTube Style)
+  if (chkAutoplay) {
+    chkAutoplay.addEventListener('change', () => {
+      state.autoplayEnabled = chkAutoplay.checked;
+      try {
+        localStorage.setItem('kot_autoplay', state.autoplayEnabled ? '1' : '0');
+      } catch (e) {}
+    });
+  }
+
+  // View Related Recommendations Button (Banner on Home)
+  if (btnViewRelated) {
+    btnViewRelated.addEventListener('click', () => {
+      openFullPlayer();
+      setTimeout(() => {
+        if (fullUpnextSection) {
+          fullUpnextSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
     });
   }
 }

@@ -122,9 +122,16 @@
       </section>
 
       <!-- YouTube Filter Chips: Single Horizontal Edge-to-Edge Scroll Row -->
+      <!-- YouTube Filter Chips: Single Horizontal Edge-to-Edge Scroll Row -->
       <nav class="filter-chips-nav" aria-label="Categories">
         <div class="category-chips-scroll" role="tablist">
-          <button class="chip-item active" data-cat="khmer" id="tabKhmer" role="tab" aria-selected="true">
+          <button class="chip-item active" data-cat="recommended" id="tabRecommended" role="tab" aria-selected="true">
+            ✨ សម្រាប់អ្នក
+          </button>
+          <button class="chip-item" data-cat="history" id="tabHistory" role="tab" aria-selected="false">
+            🎧 ស្តាប់ឡើងវិញ
+          </button>
+          <button class="chip-item" data-cat="khmer" id="tabKhmer" role="tab" aria-selected="false">
             🇰🇭 ចម្រៀងខ្មែរ
           </button>
           <button class="chip-item" data-cat="chill" id="tabChill" role="tab" aria-selected="false">
@@ -152,12 +159,16 @@
       <section class="songs-section">
         <div class="section-header">
           <div class="section-title-wrap">
-            <h2 id="sectionTitle" class="section-title">🇰🇭 ចម្រៀងខ្មែរពេញនិយម</h2>
+            <h2 id="sectionTitle" class="section-title">✨ ចម្រៀងណែនាំសម្រាប់អ្នក</h2>
             <span id="songsCountBadge" class="section-count">កំពុងដំណើរការ...</span>
             <span id="activeCategoryPlayingBadge" class="active-category-pill hidden">
               <span class="active-pill-dot"></span>
               <span id="activeCategoryPlayingText">កំពុងចាក់បន្តក្នុង Vibe នេះ</span>
             </span>
+            <div id="recommendedTasteNote" class="recommended-taste-note hidden">
+              <span class="taste-sparkle">🎯</span>
+              <span id="recommendedTasteText">ផ្អែកលើបទដែលអ្នកចូលចិត្តស្តាប់</span>
+            </div>
           </div>
 
           <div class="section-actions">
@@ -168,6 +179,21 @@
               <span>ចាក់ទាំងអស់</span>
             </button>
           </div>
+        </div>
+
+        <!-- YouTube Style: Playing Song Related Banner (Quick Access) -->
+        <div id="playingRelatedBanner" class="playing-related-banner hidden">
+          <div class="playing-related-left">
+            <span class="playing-pulse-dot"></span>
+            <span class="playing-related-tag">កំពុងចាក់:</span>
+            <span id="playingRelatedTitle" class="playing-related-title">បទចម្រៀង</span>
+          </div>
+          <button id="btnViewRelated" class="btn-view-related" title="មើលបទចម្រៀងស្រដៀងគ្នា">
+            <span>✨ មើលបទស្រដៀងគ្នា</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
         </div>
 
         <!-- Songs Grid (Immediate Content) -->
@@ -709,6 +735,30 @@
             <div class="seek-fill" id="volFill" style="width: 100%;"></div>
           </div>
         </div>
+
+        <!-- YouTube Style: Up Next & Related Recommendations Section -->
+        <section class="full-upnext-section" id="fullUpnextSection">
+          <div class="upnext-header">
+            <div class="upnext-title-wrap">
+              <span class="upnext-icon">✨</span>
+              <div class="upnext-headings">
+                <h3 class="upnext-title">បទបន្ទាប់ &amp; ចម្រៀងស្រដៀងគ្នា</h3>
+                <span class="upnext-badge" id="upnextCountBadge">កំពុងទាញយក...</span>
+              </div>
+            </div>
+            <!-- YouTube Autoplay Toggle Switch -->
+            <label class="autoplay-toggle-wrap" title="ចាក់បទបន្ទាប់ដោយស្វ័យប្រវត្តិ (YouTube Autoplay)">
+              <span class="autoplay-label">Autoplay</span>
+              <input type="checkbox" id="chkAutoplay" checked aria-label="Toggle Autoplay">
+              <span class="autoplay-switch"></span>
+            </label>
+          </div>
+
+          <!-- Up Next Song Cards List -->
+          <div class="upnext-list" id="upnextList">
+            <!-- Dynamic related cards loaded via JS -->
+          </div>
+        </section>
 
         <!-- Lock Screen Tip Footer -->
         <div class="full-footer-tip">
