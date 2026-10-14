@@ -17,12 +17,12 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <meta name="mobile-web-app-capable" content="yes">
 
-  <!-- Google Fonts: Kantumruy Pro (Khmer) + Outfit & Plus Jakarta Sans (English) -->
+  <!-- Premium Typography: Kantumruy Pro & Noto Sans Khmer (Khmer) + Plus Jakarta Sans (English) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Noto+Sans+Khmer:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="/style.css?v=ios_lockscreen_v6">
+  <link rel="stylesheet" href="/style.css?v=yt_video_v11">
 </head>
 <body>
   <!-- Ambient background glow elements -->
@@ -65,6 +65,7 @@
             <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
           </svg>
           <span class="header-fx-indicator"></span>
+          <span id="headerFxModeText" class="header-fx-text hidden">Bose</span>
         </button>
 
         <button id="btnQueueToggle" class="btn-header-icon" title="បញ្ជីចម្រៀង (Queue)" aria-label="Open Queue">
@@ -132,11 +133,17 @@
           <button class="chip-item" data-cat="pop" id="tabPop" role="tab" aria-selected="false">
             🔥 Pop Hits
           </button>
+          <button class="chip-item" data-cat="sad" id="tabSad" role="tab" aria-selected="false">
+            💔 កម្សត់ (Sad)
+          </button>
           <button class="chip-item" data-cat="sleep" id="tabSleep" role="tab" aria-selected="false">
             🌙 Deep Sleep
           </button>
           <button class="chip-item" data-cat="edm" id="tabEdm" role="tab" aria-selected="false">
             ⚡ Cyber EDM
+          </button>
+          <button class="chip-item" data-cat="tiktok" id="tabTiktok" role="tab" aria-selected="false">
+            🚀 TikTok Viral
           </button>
         </div>
       </nav>
@@ -147,10 +154,14 @@
           <div class="section-title-wrap">
             <h2 id="sectionTitle" class="section-title">🇰🇭 ចម្រៀងខ្មែរពេញនិយម</h2>
             <span id="songsCountBadge" class="section-count">កំពុងដំណើរការ...</span>
+            <span id="activeCategoryPlayingBadge" class="active-category-pill hidden">
+              <span class="active-pill-dot"></span>
+              <span id="activeCategoryPlayingText">កំពុងចាក់បន្តក្នុង Vibe នេះ</span>
+            </span>
           </div>
 
           <div class="section-actions">
-            <button id="btnPlayAll" class="btn-pill-action" title="ចាក់ទាំងអស់">
+            <button id="btnPlayAll" class="btn-pill-action" title="ចាក់ទាំងអស់ក្នុង Category នេះ">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
@@ -190,12 +201,17 @@
           </button>
         </div>
       </div>
+      <div class="queue-context-banner" id="queueContextBanner">
+        <span class="banner-icon">🎧</span>
+        <span class="banner-label">កំពុងចាក់បន្តក្នុង:</span>
+        <strong id="queueContextTitle" class="banner-name">🇰🇭 ចម្រៀងខ្មែរ</strong>
+      </div>
       <div id="queueList" class="drawer-content">
         <!-- Rendered by JS -->
       </div>
     </aside>
 
-    <!-- Side Drawer: Favorites / Liked Songs -->
+    <!-- Side Drawer: Favorites / Liked Songs with Vibe Filtering -->
     <aside id="favDrawer" class="side-drawer hidden" aria-label="Favorites List">
       <div class="drawer-header">
         <div class="drawer-title-wrap">
@@ -203,6 +219,7 @@
           <span id="favTotalCount" class="drawer-badge">0 បទ</span>
         </div>
         <div class="drawer-controls">
+          <button id="btnClearFav" class="btn-text-action" title="សម្អាតទាំងអស់">សម្អាត</button>
           <button id="btnCloseFav" class="btn-icon" aria-label="Close Favorites">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -211,6 +228,35 @@
           </button>
         </div>
       </div>
+
+      <!-- Favorites Vibe Categories Horizontal Filter Tabs -->
+      <div class="fav-vibes-container">
+        <div class="fav-vibes-header">
+          <span class="fav-vibes-title">បែងចែកតាម Vibe៖</span>
+        </div>
+        <div class="fav-vibes-scroll" id="favVibesScroll" role="tablist">
+          <button class="fav-vibe-chip active" data-vibe="all">✨ ទាំងអស់ (<span id="favCountAll">0</span>)</button>
+          <button class="fav-vibe-chip" data-vibe="khmer">🇰🇭 ខ្មែរ (<span id="favCountKhmer">0</span>)</button>
+          <button class="fav-vibe-chip" data-vibe="chill">☕ Chill (<span id="favCountChill">0</span>)</button>
+          <button class="fav-vibe-chip" data-vibe="pop">🔥 Pop (<span id="favCountPop">0</span>)</button>
+          <button class="fav-vibe-chip" data-vibe="sad">💔 កម្សត់ (<span id="favCountSad">0</span>)</button>
+          <button class="fav-vibe-chip" data-vibe="sleep">🌙 Sleep (<span id="favCountSleep">0</span>)</button>
+          <button class="fav-vibe-chip" data-vibe="edm">⚡ EDM (<span id="favCountEdm">0</span>)</button>
+          <button class="fav-vibe-chip" data-vibe="tiktok">🚀 TikTok (<span id="favCountTiktok">0</span>)</button>
+        </div>
+      </div>
+
+      <!-- Action Row: Play All in Selected Favorites Vibe -->
+      <div class="fav-action-bar">
+        <button id="btnPlayAllFav" class="btn-fav-playall" title="ចាក់ទាំងអស់ក្នុង Vibe នេះ">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span id="btnPlayAllFavText">ចាក់ទាំងអស់ក្នុង Vibe នេះ</span>
+        </button>
+        <span id="favVibeHint" class="fav-vibe-hint">លេងបន្តតែក្នុង Vibe នេះ</span>
+      </div>
+
       <div id="favList" class="drawer-content">
         <!-- Rendered by JS -->
       </div>
@@ -237,7 +283,10 @@
           </div>
           <div class="mini-text-wrap">
             <div id="miniTrackTitle" class="mini-track-title">មិនទាន់ចាក់បទចម្រៀង</div>
-            <div id="miniTrackArtist" class="mini-track-artist">KOT Music</div>
+            <div class="mini-subtext-row">
+              <div id="miniTrackArtist" class="mini-track-artist">KOT Music</div>
+              <span id="miniVibeBadge" class="mini-vibe-badge hidden">🇰🇭 ចម្រៀងខ្មែរ</span>
+            </div>
           </div>
         </div>
 
@@ -268,8 +317,12 @@
           </button>
         </div>
 
-        <!-- Right: Sound FX, Like & Expand -->
+        <!-- Right: MP3/MP4 Switcher, Sound FX, Like & Expand -->
         <div class="mini-tools">
+          <button id="btnMiniModeToggle" class="mode-pill-toggle" title="ប្តូរ MP3 / MP4 (Audio / Video)" aria-label="Toggle MP3 / MP4">
+            <span class="mode-pill-badge active" id="miniBadgeMp3">MP3</span>
+            <span class="mode-pill-badge" id="miniBadgeMp4">MP4</span>
+          </button>
           <button id="btnOpenSoundFxMini" class="ctrl-btn-tool" title="TikTok &amp; Bose Sound FX" aria-label="Sound Engine">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
@@ -357,9 +410,16 @@
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </button>
-          <div class="full-header-title">
-            <span>កំពុងចាក់ចម្រៀង</span>
-            <span class="full-status-pill">🔒 Lock Screen Active</span>
+          <!-- MP3 / MP4 Mode Switcher Segmented Control -->
+          <div class="media-mode-switcher" id="fullMediaModeSwitcher" role="tablist" aria-label="Media Mode">
+            <button id="btnFullModeMp3" class="mode-tab active" data-mode="audio" title="ចាក់តែសម្លេង MP3 (Background & Lock Screen)">
+              <span class="mode-tab-icon">🎵</span>
+              <span class="mode-tab-label">MP3</span>
+            </button>
+            <button id="btnFullModeMp4" class="mode-tab" data-mode="video" title="ចាក់វីដេអូ MP4 (YouTube Video)">
+              <span class="mode-tab-icon">🎬</span>
+              <span class="mode-tab-label">MP4</span>
+            </button>
           </div>
           <button id="btnFullQueueToggle" class="btn-icon" title="មើលបញ្ជី Queue" aria-label="Open Queue">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
@@ -370,19 +430,170 @@
           </button>
         </div>
 
-        <!-- Center Stage: Vinyl & Artwork -->
-        <div class="full-art-stage">
-          <div class="art-glow-ring" id="artGlowRing"></div>
-          <div class="vinyl-disc-wrap" id="vinylDiscWrap">
-            <div class="vinyl-grooves"></div>
-            <img id="fullTrackArt" src="/favicon.svg" alt="Album Cover" class="full-album-art">
-            <div class="vinyl-center-pin"></div>
+        <!-- Center Stage: Audio (Vinyl) OR Video (YouTube Player) -->
+        <div class="stage-viewport" id="stageViewport">
+          <!-- Audio Stage -->
+          <div class="full-art-stage" id="audioStageWrap">
+            <div class="art-glow-ring" id="artGlowRing"></div>
+            <div class="vinyl-disc-wrap" id="vinylDiscWrap">
+              <div class="vinyl-grooves"></div>
+              <img id="fullTrackArt" src="/favicon.svg" alt="Album Cover" class="full-album-art">
+              <div class="vinyl-center-pin"></div>
+            </div>
+            <!-- Real-time Audio Spectrum Visualizer -->
+            <div class="visualizer-container">
+              <canvas id="visualizerCanvas" width="340" height="48"></canvas>
+            </div>
           </div>
-        </div>
 
-        <!-- Real-time Audio Spectrum Visualizer -->
-        <div class="visualizer-container">
-          <canvas id="visualizerCanvas" width="340" height="48"></canvas>
+          <!-- Video Stage (YouTube UI Video Player) -->
+          <div class="full-video-stage hidden" id="videoStageWrap">
+            <!-- Dynamic Cinema Ambient Glow (YouTube Ambient Mode) -->
+            <div class="yt-ambient-glow" id="ytAmbientGlow"></div>
+
+            <div class="yt-video-container" id="ytVideoContainer">
+              <video id="videoPlayer" class="yt-video-element" playsinline webkit-playsinline></video>
+
+              <!-- Video Loading Spinner -->
+              <div class="yt-video-spinner hidden" id="videoSpinner">
+                <div class="spinner-circle"></div>
+              </div>
+
+              <!-- YouTube Player Overlay Controls (Authentic YouTube Mobile UI - Image 2) -->
+              <div class="yt-controls-overlay" id="ytControlsOverlay">
+                <!-- Top Row: Minimize [v] | Title / Channel | Cast, CC, Settings [⚙️] -->
+                <div class="yt-overlay-top">
+                  <button id="btnYtMinimize" class="yt-icon-btn yt-minimize-btn" title="បង្រួមវីដេអូ (Minimize)" aria-label="Minimize video">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+
+                  <div class="yt-overlay-title-wrap">
+                    <span class="yt-overlay-title" id="ytOverlayTitle">KOT Music</span>
+                  </div>
+
+                  <div class="yt-overlay-actions">
+                    <!-- Cast / Remote Connect -->
+                    <button id="btnYtCast" class="yt-icon-btn" title="ភ្ជាប់ទូរស័ព្ទ / Cast" aria-label="Cast to TV or Phone">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"></path>
+                        <line x1="2" y1="20" x2="2.01" y2="20"></line>
+                      </svg>
+                    </button>
+                    <!-- Closed Captions [CC] -->
+                    <button id="btnYtCc" class="yt-icon-btn yt-badge-cc" title="អក្សររត់ / CC" aria-label="Closed Captions">
+                      <span>CC</span>
+                    </button>
+                    <!-- Settings Gear [⚙️] -->
+                    <button id="btnYtSettings" class="yt-icon-btn" title="ការកំណត់ (Settings)" aria-label="YouTube Settings">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Center Touch & Play Controls (Previous | Center Play/Pause | Next) -->
+                <div class="yt-overlay-center">
+                  <!-- Double Tap 10s Rewind zone -->
+                  <div class="yt-tap-seek" id="ytTapRewind" title="ចុចពីរដងថយ 10s">
+                    <div class="yt-seek-anim">
+                      <span class="yt-seek-icon">⏪</span>
+                      <span class="yt-seek-text">10 វិនាទី</span>
+                    </div>
+                  </div>
+
+                  <!-- Previous Button (Image 2) -->
+                  <button id="btnYtPrev" class="yt-media-btn" title="បទមុន (Previous)" aria-label="Previous track">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                      <polygon points="19 20 9 12 19 4 19 20"></polygon>
+                      <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5"></line>
+                    </svg>
+                  </button>
+
+                  <!-- Big Center Play / Pause Circle (Image 2) -->
+                  <button id="btnYtCenterPlay" class="yt-center-play-btn" aria-label="Play / Pause video">
+                    <svg id="iconYtCenterPlay" viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
+                      <polygon points="6 4 19 12 6 20 6 4"></polygon>
+                    </svg>
+                    <svg id="iconYtCenterPause" class="hidden" viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
+                      <rect x="6" y="4" width="4" height="16"></rect>
+                      <rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                  </button>
+
+                  <!-- Next Button (Image 2) -->
+                  <button id="btnYtNext" class="yt-media-btn" title="បទបន្ទាប់ (Next)" aria-label="Next track">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+                      <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                      <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"></line>
+                    </svg>
+                  </button>
+
+                  <!-- Double Tap 10s Forward zone -->
+                  <div class="yt-tap-seek" id="ytTapForward" title="ចុចពីរដងទៅមុខ 10s">
+                    <div class="yt-seek-anim">
+                      <span class="yt-seek-icon">⏩</span>
+                      <span class="yt-seek-text">10 វិនាទី</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bottom Bar: Time [0:04 / 4:19] | Scrubber | Fullscreen [⛶] (Image 2) -->
+                <div class="yt-overlay-bottom">
+                  <div class="yt-bottom-info-row">
+                    <div class="yt-time-display" id="ytTimeDisplay">
+                      <span id="ytTimeCurrent">0:00</span>
+                      <span class="yt-time-sep">/</span>
+                      <span id="ytTimeDuration">0:00</span>
+                    </div>
+                    <div class="yt-bottom-actions">
+                      <button id="btnYtPip" class="yt-icon-btn yt-btn-bottom" title="រូបក្នុងរូប (PiP)" aria-label="Picture in picture">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                          <rect x="13" y="11" width="7" height="6" rx="1" fill="currentColor"></rect>
+                        </svg>
+                      </button>
+                      <button id="btnYtFullscreen" class="yt-icon-btn yt-btn-bottom" title="ពេញអេក្រង់ (Fullscreen)" aria-label="Fullscreen">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- YouTube Red Scrubber Track with thumb -->
+                  <div class="yt-scrubber-track" id="ytScrubberTrack">
+                    <div class="yt-scrubber-buffer" id="ytScrubberBuffer"></div>
+                    <div class="yt-scrubber-progress" id="ytScrubberProgress">
+                      <span class="yt-scrubber-thumb"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Floating Mini Player Controls (Image 3 - Floating PiP Card) -->
+              <div class="yt-floating-overlay hidden" id="ytFloatingOverlay">
+                <button id="btnFloatingPlay" class="yt-floating-play-btn" title="ចាក់ / ផ្អាក" aria-label="Play/Pause">
+                  <svg id="iconFloatingPlay" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                    <polygon points="6 4 19 12 6 20 6 4"></polygon>
+                  </svg>
+                  <svg id="iconFloatingPause" class="hidden" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16"></rect>
+                    <rect x="14" y="4" width="4" height="16"></rect>
+                  </svg>
+                </button>
+                <button id="btnFloatingClose" class="yt-floating-close-btn" title="បិទវីដេអូ (Close Video)" aria-label="Close">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Sound FX Quick Pill in Full Player -->
@@ -408,6 +619,9 @@
         <!-- Song Metadata -->
         <div class="full-track-meta">
           <div class="meta-text">
+            <div class="full-vibe-tag-row">
+              <span id="fullVibeBadge" class="full-vibe-pill">🎧 🇰🇭 ចម្រៀងខ្មែរ</span>
+            </div>
             <h2 id="fullTrackTitle" class="full-title">ឈ្មោះបទចម្រៀង</h2>
             <p id="fullTrackArtist" class="full-artist">ឈ្មោះតារាចម្រៀង</p>
           </div>
@@ -707,14 +921,14 @@
 
         <div class="phone-connect-content">
           <div class="qr-preview-box">
-            <img id="qrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=http%3A%2F%2F192.168.25.125%3A3000&color=8B5CF6&bgcolor=0E1326" alt="QR Code" class="qr-code-img">
+            <img id="qrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=http%3A%2F%2F172.16.0.219%3A3000&color=8B5CF6&bgcolor=0E1326" alt="QR Code" class="qr-code-img">
             <p class="qr-tip">ស្កេនជាមួយ Camera (iPhone) ឬ Google Lens (Android)</p>
           </div>
 
           <div class="phone-url-card">
             <label class="phone-url-label">អាសយដ្ឋាន Link លើទូរស័ព្ទ (Wi-Fi ជាមួយគ្នា):</label>
             <div class="phone-url-copy-row">
-              <input type="text" id="phoneUrlInput" readonly value="http://192.168.25.125:3000" class="phone-url-input">
+              <input type="text" id="phoneUrlInput" readonly value="http://172.16.0.219:3000" class="phone-url-input">
               <button id="btnCopyPhoneUrl" class="btn-copy-url">
                 <span id="copyUrlText">ចម្លង Link</span>
               </button>
@@ -747,8 +961,191 @@
         </div>
       </div>
     </div>
+  <!-- Vibe Selector Modal (Change song's Vibe category) -->
+  <div id="vibeSelectorModal" class="vibe-modal hidden" aria-modal="true" role="dialog" aria-label="ជ្រើសរើសប្រភេទ Vibe">
+    <div class="vibe-modal-backdrop" id="vibeModalBackdrop"></div>
+    <div class="vibe-modal-sheet">
+      <div class="vibe-modal-handle"></div>
+      <div class="vibe-modal-header">
+        <div class="vibe-modal-title-wrap">
+          <span class="vibe-modal-icon">🏷️</span>
+          <h3 class="vibe-modal-title">ប្តូរ Vibe ប្រភេទចម្រៀង</h3>
+        </div>
+        <button id="btnCloseVibeModal" class="btn-icon" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <p id="vibeModalSongTitle" class="vibe-modal-song">ឈ្មោះបទចម្រៀង</p>
+      <div class="vibe-modal-grid" id="vibeModalGrid">
+        <button class="vibe-choice-btn" data-vibe="khmer">
+          <span class="vibe-choice-emoji">🇰🇭</span>
+          <span class="vibe-choice-name">ចម្រៀងខ្មែរ (Khmer)</span>
+        </button>
+        <button class="vibe-choice-btn" data-vibe="chill">
+          <span class="vibe-choice-emoji">☕</span>
+          <span class="vibe-choice-name">Chill &amp; Lo-Fi</span>
+        </button>
+        <button class="vibe-choice-btn" data-vibe="pop">
+          <span class="vibe-choice-emoji">🔥</span>
+          <span class="vibe-choice-name">Pop Hits</span>
+        </button>
+        <button class="vibe-choice-btn" data-vibe="sad">
+          <span class="vibe-choice-emoji">💔</span>
+          <span class="vibe-choice-name">កម្សត់ (Sad Emotional)</span>
+        </button>
+        <button class="vibe-choice-btn" data-vibe="sleep">
+          <span class="vibe-choice-emoji">🌙</span>
+          <span class="vibe-choice-name">Deep Sleep</span>
+        </button>
+        <button class="vibe-choice-btn" data-vibe="edm">
+          <span class="vibe-choice-emoji">⚡</span>
+          <span class="vibe-choice-name">Cyber EDM</span>
+        </button>
+        <button class="vibe-choice-btn" data-vibe="tiktok">
+          <span class="vibe-choice-emoji">🚀</span>
+          <span class="vibe-choice-name">TikTok Viral</span>
+        </button>
+      </div>
+    </div>
   </div>
 
-  <script src="/app.js?v=ios_lockscreen_v6"></script>
+  <!-- YouTube Settings Modal (YouTube-Style Settings Menu & Quality / Speed Pickers) -->
+  <div id="ytSettingsModal" class="yt-settings-modal hidden" aria-modal="true" role="dialog" aria-label="YouTube Settings">
+    <div class="yt-settings-backdrop" id="ytSettingsBackdrop"></div>
+    <div class="yt-settings-sheet">
+      <div class="yt-settings-handle"></div>
+      <div class="yt-settings-header">
+        <button id="btnYtSettingsBack" class="btn-icon hidden" title="ត្រឡប់ក្រោយ" aria-label="Back">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <h3 id="ytSettingsTitle" class="yt-settings-title">⚙️ ការកំណត់ (Settings)</h3>
+        <button id="btnCloseYtSettings" class="btn-icon" aria-label="Close Settings">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <!-- Main YouTube Settings Menu -->
+      <div id="ytSettingsMainMenu" class="yt-settings-menu-list">
+        <!-- 1. Quality -->
+        <div class="yt-setting-item" id="itemYtQuality">
+          <div class="yt-setting-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"></path></svg>
+          </div>
+          <div class="yt-setting-info">
+            <div class="yt-setting-label">គុណភាពវីដេអូ (Quality)</div>
+            <div class="yt-setting-sublabel" id="valYtQuality">Auto (720p HD)</div>
+          </div>
+          <div class="yt-setting-arrow">›</div>
+        </div>
+
+        <!-- 2. Playback Speed -->
+        <div class="yt-setting-item" id="itemYtSpeed">
+          <div class="yt-setting-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          </div>
+          <div class="yt-setting-info">
+            <div class="yt-setting-label">ល្បឿនចាក់ (Playback Speed)</div>
+            <div class="yt-setting-sublabel" id="valYtSpeed">ធម្មតា (1.0x)</div>
+          </div>
+          <div class="yt-setting-arrow">›</div>
+        </div>
+
+        <!-- 3. Loop Video Toggle -->
+        <div class="yt-setting-item" id="itemYtLoop">
+          <div class="yt-setting-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+          </div>
+          <div class="yt-setting-info">
+            <div class="yt-setting-label">ចាក់សារឡើងវិញ (Loop Video)</div>
+            <div class="yt-setting-sublabel" id="valYtLoop">បិទ (Off)</div>
+          </div>
+          <label class="yt-toggle-switch" for="chkYtLoop">
+            <input type="checkbox" id="chkYtLoop">
+            <span class="yt-toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- 4. Ambient Mode Toggle -->
+        <div class="yt-setting-item" id="itemYtAmbient">
+          <div class="yt-setting-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          </div>
+          <div class="yt-setting-info">
+            <div class="yt-setting-label">ពន្លឺព័ទ្ធជុំវិញ (Ambient Mode)</div>
+            <div class="yt-setting-sublabel" id="valYtAmbient">បើក (Cinema Glow)</div>
+          </div>
+          <label class="yt-toggle-switch" for="chkYtAmbient">
+            <input type="checkbox" id="chkYtAmbient" checked>
+            <span class="yt-toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- 5. Picture in Picture (PiP) -->
+        <div class="yt-setting-item" id="itemYtPipAction">
+          <div class="yt-setting-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><rect x="13" y="11" width="7" height="6" rx="1" fill="currentColor"></rect></svg>
+          </div>
+          <div class="yt-setting-info">
+            <div class="yt-setting-label">រូបក្នុងរូប (Picture-in-Picture)</div>
+            <div class="yt-setting-sublabel">ចាក់លើផ្ទាំងតូចអណ្តែតលើអេក្រង់</div>
+          </div>
+          <div class="yt-setting-arrow">⤢</div>
+        </div>
+
+        <!-- 6. Switch to MP3 Audio Only -->
+        <div class="yt-setting-item" id="itemYtSwitchAudio">
+          <div class="yt-setting-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+          </div>
+          <div class="yt-setting-info">
+            <div class="yt-setting-label">ប្តូរទៅចាក់តែសម្លេង (MP3 Mode)</div>
+            <div class="yt-setting-sublabel">សន្សំថ្មទូរស័ព្ទ &amp; Lock Screen Background</div>
+          </div>
+          <div class="yt-setting-arrow">🎧</div>
+        </div>
+      </div>
+
+      <!-- Subpage: Quality Selector -->
+      <div id="ytSettingsQualityPage" class="yt-settings-subpage hidden">
+        <div class="yt-option-item active" data-quality="auto">
+          <span class="yt-option-text">Auto (ស្វ័យប្រវត្តិតាម Internet)</span>
+          <span class="yt-check">✓</span>
+        </div>
+        <div class="yt-option-item" data-quality="720p">
+          <span class="yt-option-text">720p HD (គុណភាពច្បាស់)</span>
+          <span class="yt-check"></span>
+        </div>
+        <div class="yt-option-item" data-quality="480p">
+          <span class="yt-option-text">480p (កម្រិតមធ្យម)</span>
+          <span class="yt-check"></span>
+        </div>
+        <div class="yt-option-item" data-quality="360p">
+          <span class="yt-option-text">360p (សន្សំ Data)</span>
+          <span class="yt-check"></span>
+        </div>
+        <div class="yt-option-item" data-quality="240p">
+          <span class="yt-option-text">240p (សន្សំ Data បំផុត)</span>
+          <span class="yt-check"></span>
+        </div>
+      </div>
+
+      <!-- Subpage: Speed Selector -->
+      <div id="ytSettingsSpeedPage" class="yt-settings-subpage hidden">
+        <div class="yt-option-item" data-speed="0.25"><span class="yt-option-text">0.25x (យឺតខ្លាំង)</span><span class="yt-check"></span></div>
+        <div class="yt-option-item" data-speed="0.5"><span class="yt-option-text">0.5x (យឺត)</span><span class="yt-check"></span></div>
+        <div class="yt-option-item" data-speed="0.75"><span class="yt-option-text">0.75x</span><span class="yt-check"></span></div>
+        <div class="yt-option-item active" data-speed="1.0"><span class="yt-option-text">ធម្មតា (1.0x Normal)</span><span class="yt-check">✓</span></div>
+        <div class="yt-option-item" data-speed="1.25"><span class="yt-option-text">1.25x</span><span class="yt-check"></span></div>
+        <div class="yt-option-item" data-speed="1.5"><span class="yt-option-text">1.5x (លឿន)</span><span class="yt-check"></span></div>
+        <div class="yt-option-item" data-speed="1.75"><span class="yt-option-text">1.75x</span><span class="yt-check"></span></div>
+        <div class="yt-option-item" data-speed="2.0"><span class="yt-option-text">2.0x (លឿនទ្វេដង)</span><span class="yt-check"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=yt_video_v11"></script>
 </body>
 </html>
