@@ -23,6 +23,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Noto+Sans+Khmer:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="/style.css?v=yt_video_v11">
+  <link rel="stylesheet" href="/css/sound-fx.css">
 </head>
 <body>
   <!-- Ambient background glow elements -->
@@ -622,25 +623,6 @@
           </div>
         </div>
 
-        <!-- Sound FX Quick Pill in Full Player -->
-        <div class="full-soundfx-pill-wrap">
-          <button id="btnOpenSoundFxFull" class="full-soundfx-pill" title="បើកមុខងារសម្លេង TikTok &amp; Bose">
-            <span class="pill-dot"></span>
-            <span class="pill-icon">🎧</span>
-            <span>Sound FX: <strong id="fullFxModeText">Bose Master</strong></span>
-            <span class="pill-arrow">⚙️</span>
-          </button>
-        </div>
-
-        <!-- Quick Sound FX Presets Row (Thumb-Friendly Touch Row) -->
-        <div class="full-quick-presets-scroll" id="fullQuickPresetsScroll" aria-label="Quick Sound FX">
-          <button class="quick-preset-chip active" data-preset="bose">🎧 Bose Master</button>
-          <button class="quick-preset-chip" data-preset="tiktok">🔥 TikTok 808</button>
-          <button class="quick-preset-chip" data-preset="slowed">🌙 Slowed+Reverb</button>
-          <button class="quick-preset-chip" data-preset="spedup">⚡ Sped Up</button>
-          <button class="quick-preset-chip" data-preset="vocal">🎤 Vocal</button>
-          <button class="quick-preset-chip" data-preset="flat">🎚️ Flat</button>
-        </div>
 
         <!-- Song Metadata -->
         <div class="full-track-meta">
@@ -1079,6 +1061,21 @@
 
       <!-- Main YouTube Settings Menu -->
       <div id="ytSettingsMainMenu" class="yt-settings-menu-list">
+        <!-- 0. Sound FX & Equalizer Setting -->
+        <div class="yt-setting-item" id="itemYtSoundFxSetting">
+          <div class="yt-setting-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+              <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+            </svg>
+          </div>
+          <div class="yt-setting-info">
+            <div class="yt-setting-label">ប្រភេទសំឡេង (TikTok &amp; Bose Pro)</div>
+            <div class="yt-setting-sublabel" id="valYtSoundPreset">Bose Master</div>
+          </div>
+          <div class="yt-setting-arrow">›</div>
+        </div>
+
         <!-- 1. Quality -->
         <div class="yt-setting-item" id="itemYtQuality">
           <div class="yt-setting-icon">

@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#070913">
+  <meta name="description" content="KOT Music Video Watch - 100% គ្មានពាណិជ្ជកម្ម ចាក់ចម្រៀង និងវីដេអូកម្រិតខ្ពស់">
+  <title>KOT Music - ទស្សនាវីដេអូ (YouTube Cinema Style)</title>
+  
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <!-- Modular CSS Files -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/watch.css">
+  <link rel="stylesheet" href="/css/sound-fx.css">
+</head>
+<body class="watch-page-body">
+
+  <!-- Top Navigation Bar -->
+  <header class="watch-nav-header">
+    <div class="watch-nav-left">
+      <a href="/" class="btn-watch-back" title="ត្រឡប់ទៅទំព័រដើម" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+      </a>
+      <a href="/" class="watch-logo">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        </svg>
+        <span>KOT Watch</span>
+      </a>
+    </div>
+
+    <div class="watch-nav-right">
+      <a href="/" class="btn-nav-icon" title="ស្វែងរកចម្រៀង" aria-label="Search">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </a>
+      <button type="button" class="btn-nav-icon" id="btnWatchSettings" title="ការកំណត់ (Settings & Sound FX)" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Cinema Video Stage -->
+  <main class="watch-stage-wrap">
+    <div class="watch-video-box" id="watchVideoBox">
+      <!-- Ambient Backlight -->
+      <div class="watch-ambient-glow" id="watchAmbientGlow"></div>
+
+      <!-- HTML5 Video Element -->
+      <video class="watch-video-element" id="watchVideo" playsinline preload="auto"></video>
+
+      <!-- Double Tap Zones (-10s / +10s) -->
+      <div class="double-tap-zone double-tap-left" id="doubleTapLeft">
+        <div class="double-tap-ripple" id="rippleLeft">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="11 17 6 12 11 7"></polyline>
+            <polyline points="18 17 13 12 18 7"></polyline>
+          </svg>
+          <span>-10s</span>
+        </div>
+      </div>
+      <div class="double-tap-zone double-tap-right" id="doubleTapRight">
+        <div class="double-tap-ripple" id="rippleRight">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="13 17 18 12 13 7"></polyline>
+            <polyline points="6 17 11 12 6 7"></polyline>
+          </svg>
+          <span>+10s</span>
+        </div>
+      </div>
+
+      <!-- Buffering Spinner -->
+      <div class="watch-buffering-spinner hidden" id="watchBufferingSpinner"></div>
+
+      <!-- On-Video YouTube Controls Overlay -->
+      <div class="watch-controls-overlay" id="watchOverlay">
+        <!-- Top Bar inside Video -->
+        <div class="watch-overlay-top">
+          <span class="watch-overlay-video-title" id="watchOverlayTitle">កំពុងចាក់...</span>
+          <div class="watch-overlay-top-actions">
+            <button type="button" class="btn-overlay-action" id="btnWatchPip" title="Picture in Picture" aria-label="Picture in Picture">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                <rect x="11" y="9" width="8" height="6" rx="1" fill="currentColor"></rect>
+              </svg>
+            </button>
+            <button type="button" class="btn-overlay-action" id="btnWatchFullscreen" title="ពេញអេក្រង់" aria-label="Fullscreen">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Center Play/Pause Controls -->
+        <div class="watch-overlay-center">
+          <button type="button" class="btn-overlay-skip" id="btnWatchPrev" title="បទមុន" aria-label="Previous Track">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <polygon points="19 20 9 12 19 4 19 20"></polygon>
+              <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5"></line>
+            </svg>
+          </button>
+
+          <button type="button" class="btn-overlay-playpause" id="btnCenterPlay" title="ចាក់ / ផ្អាក" aria-label="Play/Pause">
+            <svg id="iconCenterPlay" viewBox="0 0 24 24" width="30" height="30" fill="currentColor">
+              <polygon points="6 4 20 12 6 20 6 4"></polygon>
+            </svg>
+            <svg id="iconCenterPause" class="hidden" viewBox="0 0 24 24" width="30" height="30" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+              <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+            </svg>
+          </button>
+
+          <button type="button" class="btn-overlay-skip" id="btnWatchNext" title="បទបន្ទាប់" aria-label="Next Track">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <polygon points="5 4 15 12 5 20 5 4"></polygon>
+              <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Bottom Bar on Video (Scrubber + Time) -->
+        <div class="watch-overlay-bottom">
+          <div class="watch-scrubber-track" id="watchScrubberTrack">
+            <div class="watch-scrubber-bar-bg">
+              <div class="watch-scrubber-buffer" id="watchScrubberBuffer"></div>
+              <div class="watch-scrubber-progress" id="watchScrubberProgress"></div>
+            </div>
+            <div class="watch-scrubber-thumb" id="watchScrubberThumb"></div>
+          </div>
+          <div class="watch-bottom-meta">
+            <div class="watch-time-display">
+              <span id="watchTimeCurrent">0:00</span>
+              <span>/</span>
+              <span id="watchTimeDuration">0:00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Video Details Section Underneath (True YouTube Mobile Style) -->
+  <section class="watch-content-container">
+    <div class="watch-info-header">
+      <h1 class="watch-video-title" id="videoTitle">កំពុងផ្ទុកចំណងជើង...</h1>
+      
+      <div class="watch-channel-row">
+        <div class="watch-channel-left">
+          <img class="watch-channel-avatar" id="channelAvatar" src="/icons/icon.png" alt="Channel Avatar" />
+          <div class="watch-channel-meta">
+            <span class="watch-channel-name">
+              <span id="channelName">KOT Music</span>
+              <span class="verified-badge" title="Verified">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+              </span>
+            </span>
+            <span class="watch-channel-sub">100% គ្មានពាណិជ្ជកម្ម</span>
+          </div>
+        </div>
+
+        <button type="button" class="watch-pill-btn highlight" id="btnSwitchMp3" title="ស្តាប់ជា MP3 (បិទអេក្រង់បាន)" aria-label="Switch to MP3">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+          <span>🎵 ស្តាប់ជា MP3</span>
+        </button>
+      </div>
+
+      <!-- Action Pills Row -->
+      <div class="watch-action-pills-row">
+        <button type="button" class="watch-pill-btn" id="btnWatchLike">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+          <span class="pill-text">ចូលចិត្ត</span>
+        </button>
+
+        <button type="button" class="watch-pill-btn" id="btnWatchQueue">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span class="pill-text">បន្ថែម Queue</span>
+        </button>
+
+        <button type="button" class="watch-pill-btn" id="btnWatchShare">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+          <span class="pill-text">ចែករំលែក</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Up Next & Recommendations Section (Directly Below Video Details) -->
+    <div class="watch-upnext-section">
+      <div class="watch-upnext-header">
+        <div class="watch-upnext-title-wrap">
+          <h2 class="watch-upnext-title">🎬 បទចម្រៀងណែនាំបន្ត</h2>
+          <span class="watch-upnext-badge" id="watchUpnextBadge">15 បទ</span>
+        </div>
+        <div class="watch-autoplay-toggle">
+          <span>លេងស្វ័យប្រវត្តិ</span>
+          <label class="watch-switch">
+            <input type="checkbox" id="watchChkAutoplay" checked>
+            <span class="watch-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="watch-upnext-list" id="watchUpnextList">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Watch Settings Modal (With Sound FX & Equalizer Inside!) -->
+  <div class="watch-settings-modal hidden" id="watchSettingsModal">
+    <div class="watch-settings-backdrop" id="watchSettingsBackdrop"></div>
+    <div class="watch-settings-card">
+      <div class="watch-settings-header">
+        <h3 class="watch-settings-title">⚙️ ការកំណត់ទូទៅ (Settings)</h3>
+        <button type="button" class="btn-close-sound-fx" id="btnCloseWatchSettings">✕</button>
+      </div>
+      <div class="watch-settings-menu">
+        <!-- Sound FX Menu Item -->
+        <div class="watch-settings-item" id="itemWatchSoundFx">
+          <div class="watch-item-left">
+            <svg class="watch-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+              <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+            </svg>
+            <span>ប្រភេទសំឡេង (TikTok &amp; Bose Pro)</span>
+          </div>
+          <div class="watch-item-val">
+            <span id="valActivePreset">Bose Master</span>
+            <span>›</span>
+          </div>
+        </div>
+
+        <!-- Quality -->
+        <div class="watch-settings-item" id="itemWatchQuality">
+          <div class="watch-item-left">
+            <svg class="watch-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+            <span>គុណភាពវីដេអូ</span>
+          </div>
+          <div class="watch-item-val">
+            <span id="valWatchQuality">Auto (HD)</span>
+          </div>
+        </div>
+
+        <!-- Speed -->
+        <div class="watch-settings-item" id="itemWatchSpeed">
+          <div class="watch-item-left">
+            <svg class="watch-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>ល្បឿនលេង (Playback Speed)</span>
+          </div>
+          <div class="watch-item-val">
+            <span id="valWatchSpeed">ធម្មតា (1.0x)</span>
+          </div>
+        </div>
+
+        <!-- Ambient Glow -->
+        <div class="watch-settings-item">
+          <div class="watch-item-left">
+            <svg class="watch-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <span>ពន្លឺភ្លើងព័ទ្ធជុំវិញ (Ambient Light)</span>
+          </div>
+          <label class="watch-switch">
+            <input type="checkbox" id="chkWatchAmbient" checked>
+            <span class="watch-slider"></span>
+          </label>
+        </div>
+
+        <!-- Loop -->
+        <div class="watch-settings-item">
+          <div class="watch-item-left">
+            <svg class="watch-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="17 1 21 5 17 9"></polyline>
+              <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+              <polyline points="7 23 3 19 7 15"></polyline>
+              <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+            </svg>
+            <span>ចាក់សារឡើងវិញ (Loop Video)</span>
+          </div>
+          <label class="watch-switch">
+            <input type="checkbox" id="chkWatchLoop">
+            <span class="watch-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sound FX & Equalizer Modal (TikTok & Bose Pro) -->
+  <div class="sound-fx-modal hidden" id="soundFxModal">
+    <div class="sound-fx-backdrop" id="soundFxBackdrop"></div>
+    <div class="sound-fx-container">
+      <div class="sound-fx-header">
+        <div class="sound-fx-title-wrap">
+          <svg class="sound-fx-title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+          </svg>
+          <h3 class="sound-fx-title">ប្រភេទសំឡេង &amp; Equalizer</h3>
+        </div>
+        <button type="button" class="btn-close-sound-fx" id="btnCloseSoundFx">✕</button>
+      </div>
+
+      <div class="sound-fx-body">
+        <!-- Preset Profiles Grid -->
+        <div>
+          <div class="sound-fx-section-label">
+            <span>ជ្រើសរើសសំឡេង Preset</span>
+            <span class="badge">TikTok &amp; Bose DSP</span>
+          </div>
+          <div class="sound-presets-grid">
+            <div class="sound-preset-card active" data-preset="bose">
+              <span class="preset-icon">🎧</span>
+              <div class="preset-info">
+                <span class="preset-name">Bose Master</span>
+                <span class="preset-desc">Sub-Bass &amp; Stage</span>
+              </div>
+            </div>
+            <div class="sound-preset-card" data-preset="tiktok">
+              <span class="preset-icon">🔥</span>
+              <div class="preset-info">
+                <span class="preset-name">TikTok 808</span>
+                <span class="preset-desc">Heavy Punch &amp; Snap</span>
+              </div>
+            </div>
+            <div class="sound-preset-card" data-preset="slowed_reverb">
+              <span class="preset-icon">🌙</span>
+              <div class="preset-info">
+                <span class="preset-name">Slowed+Reverb</span>
+                <span class="preset-desc">Concert Hall Atmosphere</span>
+              </div>
+            </div>
+            <div class="sound-preset-card" data-preset="sped_up">
+              <span class="preset-icon">⚡</span>
+              <div class="preset-info">
+                <span class="preset-name">Sped Up</span>
+                <span class="preset-desc">Nightcore Fast Beats</span>
+              </div>
+            </div>
+            <div class="sound-preset-card" data-preset="vocal">
+              <span class="preset-icon">🎤</span>
+              <div class="preset-info">
+                <span class="preset-name">Vocal Clarity</span>
+                <span class="preset-desc">Clear Voices &amp; Lyrics</span>
+              </div>
+            </div>
+            <div class="sound-preset-card" data-preset="flat">
+              <span class="preset-icon">🎵</span>
+              <div class="preset-info">
+                <span class="preset-name">Original (Flat)</span>
+                <span class="preset-desc">Studio Default</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tuning Sliders -->
+        <div>
+          <div class="sound-fx-section-label">
+            <span>កែសម្រួលលម្អិត (Manual Equalizer)</span>
+          </div>
+          <div class="sound-sliders-list">
+            <div class="sound-slider-item">
+              <div class="sound-slider-header">
+                <span class="sound-slider-title">🔊 កម្រិតបាស (Sub-Bass Boost)</span>
+              </div>
+              <input type="range" class="sound-range-input" id="watchSliderBass" min="-6" max="14" step="0.5" value="6">
+            </div>
+            <div class="sound-slider-item">
+              <div class="sound-slider-header">
+                <span class="sound-slider-title">🎧 ទំហំសម្លេង 3D (Spatial Width)</span>
+              </div>
+              <input type="range" class="sound-range-input" id="watchSliderSpatial" min="100" max="200" step="5" value="150">
+            </div>
+            <div class="sound-slider-item">
+              <div class="sound-slider-header">
+                <span class="sound-slider-title">🌌 រលកសម្លេងបន្ទរ (Reverb Hall)</span>
+              </div>
+              <input type="range" class="sound-range-input" id="watchSliderReverb" min="0" max="60" step="1" value="0">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sound-fx-footer">
+        <button type="button" class="btn-reset-sound" id="btnResetSoundFx">កំណត់ដើមវិញ</button>
+        <button type="button" class="btn-apply-sound" id="btnApplySoundFx">យល់ព្រម ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modular Scripts -->
+  <script src="/js/storage.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/sound-engine.js"></script>
+  <script src="/js/watch.js"></script>
+</body>
+</html>

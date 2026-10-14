@@ -15,6 +15,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Dedicated YouTube-style Video Watch Page
+app.get('/watch', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'watch.html'));
+});
+
 // In-memory caches to speed up requests with bounded size (Anti-memory leak)
 const MAX_CACHE_ENTRIES = 250;
 const searchCache = new Map();

@@ -305,6 +305,24 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Load initial Recommended Feed for the user (YouTube style)
   loadTrending('recommended');
+
+  // Handle ?play=[id] parameter from Watch page switch
+  const urlParams = new URLSearchParams(window.location.search);
+  const playId = urlParams.get('play');
+  if (playId) {
+    fetch(`/api/related?id=${encodeURIComponent(playId)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.targetSong) {
+          playSongObject(d.targetSong, true);
+        } else {
+          playSongObject({ id: playId, title: 'KOT Track', artist: 'KOT Music' }, true);
+        }
+      })
+      .catch(() => {
+        playSongObject({ id: playId, title: 'KOT Track', artist: 'KOT Music' }, true);
+      });
+  }
 });
 
 // Auto-purge all temporary cached data on window close
@@ -3235,26 +3253,22 @@ function toggleYtControls() {
 }
 
 function switchMediaMode(targetMode) {
-  if (state.mediaMode === targetMode) {
-    if (targetMode === 'video') {
-      openFullPlayer();
+  if (targetMode === 'video') {
+    const song = state.currentSong;
+    if (song && song.id) {
+      window.location.href = `/watch?v=${encodeURIComponent(song.id)}`;
+    } else {
+      window.location.href = '/watch';
     }
     return;
   }
   state.mediaMode = targetMode;
 
   // Sync mode buttons UI
-  if (miniBadgeMp3) miniBadgeMp3.classList.toggle('active', targetMode === 'audio');
-  if (miniBadgeMp4) miniBadgeMp4.classList.toggle('active', targetMode === 'video');
-  if (btnFullModeMp3) btnFullModeMp3.classList.toggle('active', targetMode === 'audio');
-  if (btnFullModeMp4) btnFullModeMp4.classList.toggle('active', targetMode === 'video');
-
-  const song = state.currentSong;
-  if (!song) return;
-
-  if (targetMode === 'video') {
-    // Switch Audio -> Video
-    const currentTime = audio.currentTime || 0;
+  if (miniBadgeMp3) miniBadgeMp3.classList.add('active');
+  if (miniBadgeMp4) miniBadgeMp4.classList.remove('active');
+  if (btnFullModeMp3) btnFullModeMp3.classList.add('active');
+  if (btnFullModeMp4) btnFullModeMp4.classList.remove('active');
     const wasPlaying = state.isPlaying;
     audio.pause();
 
@@ -3352,6 +3366,15 @@ function setupYtSettings() {
 
   if (btnCloseYtSettings) btnCloseYtSettings.addEventListener('click', closeYtSettings);
   if (ytSettingsBackdrop) ytSettingsBackdrop.addEventListener('click', closeYtSettings);
+
+  // Sound FX Setting Item click
+  const itemYtSoundFxSetting = document.getElementById('itemYtSoundFxSetting');
+  if (itemYtSoundFxSetting) {
+    itemYtSoundFxSetting.addEventListener('click', () => {
+      closeYtSettings();
+      openSoundFxModal();
+    });
+  }
 
   // Back button from subpages
   if (btnYtSettingsBack) {
