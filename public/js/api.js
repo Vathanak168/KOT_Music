@@ -35,7 +35,7 @@ const KOTApi = {
   },
 
   async fetchVideoStream(songId, quality = 'auto') {
-    const res = await fetch(`/api/video-stream/${encodeURIComponent(songId)}?quality=${encodeURIComponent(quality)}`);
+    const res = await fetch(`/api/video-info/${encodeURIComponent(songId)}?quality=${encodeURIComponent(quality)}`);
     return await res.json();
   },
 

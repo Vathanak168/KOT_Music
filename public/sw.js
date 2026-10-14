@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kot-music-v11';
+const CACHE_NAME = 'kot-music-v15';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

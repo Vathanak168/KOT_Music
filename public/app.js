@@ -1497,6 +1497,19 @@ function loadListenHistory() {
   } catch (e) {}
 }
 
+function formatSongDuration(durationFormatted, durationSec) {
+  if (typeof durationFormatted === 'string' && durationFormatted.includes(':')) {
+    return durationFormatted;
+  }
+  const sec = typeof durationSec === 'number' && !isNaN(durationSec) ? durationSec : Number(durationFormatted);
+  if (!isNaN(sec) && sec >= 0) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  }
+  return '3:30';
+}
+
 function saveToListenHistory(song) {
   if (!song || !song.id) return;
   try {
@@ -1507,7 +1520,7 @@ function saveToListenHistory(song) {
       title: song.title,
       artist: song.artist,
       duration: song.duration,
-      durationFormatted: song.durationFormatted || song.duration || '3:30',
+      durationFormatted: formatSongDuration(song.durationFormatted, song.duration),
       thumbnail: song.thumbnail,
       playedAt: Date.now()
     });
@@ -1665,7 +1678,7 @@ function updatePlayingRelatedBanner(song) {
   if (song && state.relatedSongs && state.relatedSongs.length > 0) {
     if (playingRelatedTitle) {
       const shortTitle = song.title.length > 32 ? song.title.slice(0, 32) + '...' : song.title;
-      playingRelatedTitle.textContent = `កំពុងចាក់: ${shortTitle} • មាន ${state.relatedSongs.length} បទណែនាំបន្ត`;
+      playingRelatedTitle.textContent = `${shortTitle} • មាន ${state.relatedSongs.length} បទណែនាំបន្ត`;
     }
     playingRelatedBanner.classList.remove('hidden');
   } else {
@@ -1695,7 +1708,7 @@ function renderUpNextList() {
     card.innerHTML = `
       <div class="upnext-thumb-wrap">
         <img class="upnext-thumb" src="${song.thumbnail || '/icons/icon.png'}" alt="${escapeHtml(song.title)}" loading="lazy" />
-        <span class="upnext-time">${song.durationFormatted || song.duration || '3:30'}</span>
+        <span class="upnext-time">${formatSongDuration(song.durationFormatted, song.duration)}</span>
         <button class="upnext-play-btn" title="ចាក់ឥឡូវនេះ" aria-label="Play">
           <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13">
             <polygon points="5 3 19 12 5 21 5 3"/>
@@ -1834,7 +1847,7 @@ function renderSongCards(songs) {
     card.innerHTML = `
       <div class="card-thumbnail-wrap">
         <img class="card-thumb" src="${song.thumbnail}" alt="${escapeHtml(song.title)}" loading="lazy" decoding="async">
-        <span class="card-duration">${song.durationFormatted || '3:30'}</span>
+        <span class="card-duration">${formatSongDuration(song.durationFormatted, song.duration)}</span>
         <div class="card-play-overlay">
           <div class="play-circle-btn">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
@@ -3269,23 +3282,17 @@ function switchMediaMode(targetMode) {
   if (miniBadgeMp4) miniBadgeMp4.classList.remove('active');
   if (btnFullModeMp3) btnFullModeMp3.classList.add('active');
   if (btnFullModeMp4) btnFullModeMp4.classList.remove('active');
-    const wasPlaying = state.isPlaying;
-    audio.pause();
 
-    if (audioStageWrap) audioStageWrap.classList.add('hidden');
-    if (videoStageWrap) videoStageWrap.classList.remove('hidden');
+  // Switch Video -> Audio (MP3)
+  const song = state.currentSong;
+  const currentTime = videoPlayer ? (videoPlayer.currentTime || 0) : (audio.currentTime || 0);
+  const wasPlaying = videoPlayer ? !videoPlayer.paused : state.isPlaying;
+  if (videoPlayer) videoPlayer.pause();
 
-    loadAndPlayVideo(song, currentTime, wasPlaying);
-    openFullPlayer();
-  } else {
-    // Switch Video -> Audio (MP3)
-    const currentTime = videoPlayer ? (videoPlayer.currentTime || 0) : (audio.currentTime || 0);
-    const wasPlaying = videoPlayer ? !videoPlayer.paused : state.isPlaying;
-    if (videoPlayer) videoPlayer.pause();
+  if (videoStageWrap) videoStageWrap.classList.add('hidden');
+  if (audioStageWrap) audioStageWrap.classList.remove('hidden');
 
-    if (videoStageWrap) videoStageWrap.classList.add('hidden');
-    if (audioStageWrap) audioStageWrap.classList.remove('hidden');
-
+  if (song) {
     if (audio.src && audio.src.includes(song.id)) {
       audio.currentTime = currentTime;
       if (wasPlaying) {

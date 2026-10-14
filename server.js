@@ -11,6 +11,23 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const PYTHON_CMD = process.env.PYTHON_CMD || (process.platform === 'win32' ? 'python' : 'python3');
 
+// High-Performance Persistent Connection Pool with Keep-Alive (Zero TLS handshake delay on YouTube CDN)
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 60000,
+  maxSockets: 100,
+  maxFreeSockets: 30,
+  timeout: 60000
+});
+
+const httpAgent = new http.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 60000,
+  maxSockets: 100,
+  maxFreeSockets: 30,
+  timeout: 60000
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -111,12 +128,17 @@ async function searchYouTube(query, limit = 20) {
               thumb = item.thumbnails[item.thumbnails.length - 1].url || thumb;
             }
 
+            let durationFormatted = formatDuration(item.duration);
+            if (item.duration_string && typeof item.duration_string === 'string' && item.duration_string.includes(':')) {
+              durationFormatted = item.duration_string;
+            }
+
             results.push({
               id: item.id,
               title: item.title,
               artist: item.uploader || item.channel || 'Artist',
               duration: item.duration,
-              durationFormatted: item.duration_string || formatDuration(item.duration),
+              durationFormatted,
               thumbnail: thumb,
               url: `https://www.youtube.com/watch?v=${item.id}`
             });
@@ -161,9 +183,8 @@ function extractAudioStreamUrl(videoId) {
       '--no-warnings',
       '--no-playlist',
       '--no-check-certificates',
-      '--extractor-args', 'youtube:player_client=android,web',
       '-g',
-      '-f', 'ba/b',
+      '-f', 'ba[protocol=https]/ba/b',
       `https://www.youtube.com/watch?v=${videoId}`
     ];
 
@@ -196,25 +217,37 @@ function extractAudioStreamUrl(videoId) {
 // In-flight video extraction promises map
 const inFlightVideoExtractions = new Map();
 
-// Helper: Extract pure video stream URL (MP4 with audio) via yt-dlp with caching & stampede prevention
+// Helper: Extract video stream URL with high resolution options (4K, 1440p, 1080p, 720p, 480p, 360p, 240p)
 function extractVideoStreamUrl(videoId, quality = 'auto') {
-  const cacheKey = `${videoId}_${quality}`;
+  const q = (quality || 'auto').toLowerCase().trim();
+  const cacheKey = `${videoId}_${q}`;
   const cached = videoStreamCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < 1000 * 60 * 60 * 2) {
-    return Promise.resolve(cached.url);
+    return Promise.resolve(cached.data);
   }
 
   if (inFlightVideoExtractions.has(cacheKey)) {
     return inFlightVideoExtractions.get(cacheKey);
   }
 
-  let formatArg = '18/b/22';
-  if (quality === '720p' || quality === 'hd') {
-    formatArg = '22/18/b';
-  } else if (quality === '480p') {
-    formatArg = '18/b/22';
-  } else if (quality === '360p' || quality === '240p') {
-    formatArg = '18/b';
+  let formatArg;
+  if (q === '4k' || q === '2160p') {
+    formatArg = 'bestvideo[protocol=https][height<=2160][ext=mp4]/bestvideo[protocol=https][height<=2160]/bestvideo/best';
+  } else if (q === '1440p' || q === '2k') {
+    formatArg = 'bestvideo[protocol=https][height<=1440][ext=mp4]/bestvideo[protocol=https][height<=1440]/bestvideo/best';
+  } else if (q === '1080p' || q === 'fhd') {
+    formatArg = 'bestvideo[protocol=https][height<=1080][ext=mp4]/bestvideo[protocol=https][height<=1080]/bestvideo/best';
+  } else if (q === '720p' || q === 'hd') {
+    formatArg = 'bestvideo[protocol=https][height<=720][ext=mp4]/bestvideo[protocol=https][height<=720]/22/18/best';
+  } else if (q === '480p') {
+    formatArg = 'bestvideo[protocol=https][height<=480][ext=mp4]/bestvideo[protocol=https][height<=480]/18/best';
+  } else if (q === '360p') {
+    formatArg = '18/bestvideo[protocol=https][height<=360]/best';
+  } else if (q === '240p') {
+    formatArg = 'bestvideo[protocol=https][height<=240]/18/best';
+  } else {
+    // 'auto': prioritize high quality 1080p/720p HD for crisp video playback
+    formatArg = 'bestvideo[protocol=https][height<=1080][ext=mp4]/bestvideo[protocol=https][height<=1080]/22/18/best';
   }
 
   const extractionPromise = new Promise((resolve, reject) => {
@@ -223,7 +256,6 @@ function extractVideoStreamUrl(videoId, quality = 'auto') {
       '--no-warnings',
       '--no-playlist',
       '--no-check-certificates',
-      '--extractor-args', 'youtube:player_client=android,web',
       '-g',
       '-f', formatArg,
       `https://www.youtube.com/watch?v=${videoId}`
@@ -241,8 +273,14 @@ function extractVideoStreamUrl(videoId, quality = 'auto') {
       const urls = stdout.trim().split('\n').filter(l => l.startsWith('http'));
       if (urls.length > 0) {
         const streamUrl = urls[urls.length - 1];
-        setBoundedCache(videoStreamCache, cacheKey, { url: streamUrl, timestamp: Date.now() });
-        resolve(streamUrl);
+        const hasAudio = streamUrl.includes('itag=18') || streamUrl.includes('itag=22');
+        const videoData = {
+          url: streamUrl,
+          quality: q,
+          hasAudio
+        };
+        setBoundedCache(videoStreamCache, cacheKey, { data: videoData, timestamp: Date.now() });
+        resolve(videoData);
       } else {
         reject(new Error(stderr || 'Failed to extract video stream URL'));
       }
@@ -255,14 +293,15 @@ function extractVideoStreamUrl(videoId, quality = 'auto') {
   return extractionPromise;
 }
 
-// API: Prefetch stream URL in advance (Zero-delay next song playback)
+// API: Prefetch stream URL in advance (Zero-delay next song & video playback)
 app.get('/api/prefetch/:id', (req, res) => {
   const videoId = req.params.id;
   if (!videoId || videoId.length !== 11) {
     return res.status(400).json({ error: 'Invalid video ID' });
   }
-  // Trigger background extraction without waiting
+  // Trigger background extraction in parallel without waiting
   extractAudioStreamUrl(videoId).catch(() => {});
+  extractVideoStreamUrl(videoId, 'auto').catch(() => {});
   res.json({ success: true, prefetched: videoId });
 });
 
@@ -357,7 +396,8 @@ app.get('/api/stream/:id', async (req, res) => {
 
     const proxyReq = clientReqModule.request(directUrl, {
       method: 'GET',
-      headers: requestHeaders
+      headers: requestHeaders,
+      agent: parsedUrl.protocol === 'https:' ? httpsAgent : httpAgent
     }, (proxyRes) => {
       // If expired (403), invalidate cache
       if (proxyRes.statusCode === 403) {
@@ -372,8 +412,7 @@ app.get('/api/stream/:id', async (req, res) => {
         'content-type',
         'content-length',
         'content-range',
-        'accept-ranges',
-        'cache-control'
+        'accept-ranges'
       ];
 
       forwardedHeaders.forEach(header => {
@@ -383,6 +422,7 @@ app.get('/api/stream/:id', async (req, res) => {
       });
 
       res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
       res.setHeader('Access-Control-Allow-Origin', '*');
 
       proxyRes.pipe(res);
@@ -417,14 +457,18 @@ app.get('/api/video-info/:id', async (req, res) => {
   if (!videoId || videoId.length !== 11) {
     return res.status(400).json({ error: 'Invalid video ID' });
   }
+  const quality = (req.query.quality || 'auto').toLowerCase();
 
   try {
-    const directUrl = await extractVideoStreamUrl(videoId, req.query.quality || 'auto');
+    const videoData = await extractVideoStreamUrl(videoId, quality);
     res.json({
       success: true,
       id: videoId,
-      videoStreamUrl: `/api/video-stream/${videoId}`,
-      directUrl
+      quality: videoData.quality || quality,
+      hasAudio: videoData.hasAudio,
+      videoStreamUrl: `/api/video-stream/${videoId}?quality=${encodeURIComponent(quality)}`,
+      audioStreamUrl: `/api/stream/${videoId}`,
+      directUrl: videoData.url
     });
   } catch (err) {
     console.error(`Video extraction error for ${videoId}:`, err.message);
@@ -432,23 +476,24 @@ app.get('/api/video-info/:id', async (req, res) => {
   }
 });
 
-// API: Proxy Video Stream with full HTTP Range request support (MP4 Video Player)
+// API: Proxy Video Stream with full HTTP Range request support & Keep-Alive Connection Pool
 app.get('/api/video-stream/:id', async (req, res) => {
   const videoId = req.params.id;
   if (!videoId || videoId.length !== 11) {
     return res.status(400).send('Invalid video ID');
   }
-  const quality = req.query.quality || 'auto';
+  const quality = (req.query.quality || 'auto').toLowerCase();
 
   try {
-    let directUrl;
+    let videoData;
     try {
-      directUrl = await extractVideoStreamUrl(videoId, quality);
+      videoData = await extractVideoStreamUrl(videoId, quality);
     } catch (e) {
       videoStreamCache.delete(`${videoId}_${quality}`);
-      directUrl = await extractVideoStreamUrl(videoId, 'auto');
+      videoData = await extractVideoStreamUrl(videoId, 'auto');
     }
 
+    const directUrl = typeof videoData === 'string' ? videoData : videoData.url;
     const parsedUrl = new URL(directUrl);
     const clientReqModule = parsedUrl.protocol === 'https:' ? https : http;
 
@@ -464,7 +509,8 @@ app.get('/api/video-stream/:id', async (req, res) => {
 
     const proxyReq = clientReqModule.request(directUrl, {
       method: 'GET',
-      headers: requestHeaders
+      headers: requestHeaders,
+      agent: parsedUrl.protocol === 'https:' ? httpsAgent : httpAgent
     }, (proxyRes) => {
       // If expired (403), invalidate cache
       if (proxyRes.statusCode === 403) {
@@ -479,8 +525,7 @@ app.get('/api/video-stream/:id', async (req, res) => {
         'content-type',
         'content-length',
         'content-range',
-        'accept-ranges',
-        'cache-control'
+        'accept-ranges'
       ];
 
       forwardedHeaders.forEach(header => {
@@ -490,6 +535,7 @@ app.get('/api/video-stream/:id', async (req, res) => {
       });
 
       res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
       res.setHeader('Access-Control-Allow-Origin', '*');
 
       proxyRes.pipe(res);

@@ -102,10 +102,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (bufferingSpinner) bufferingSpinner.classList.remove('hidden');
 
     try {
+      // Update optimistic UI if metadata is provided
+      if (songMetadata) {
+        if (videoTitleEl) videoTitleEl.textContent = songMetadata.title || 'KOT Video';
+        if (overlayTitle) overlayTitle.textContent = songMetadata.title || 'KOT Video';
+        if (channelNameEl) channelNameEl.textContent = songMetadata.artist || 'YouTube';
+        if (channelAvatar && songMetadata.thumbnail) channelAvatar.src = songMetadata.thumbnail;
+        if (ambientGlow && songMetadata.thumbnail) ambientGlow.style.backgroundImage = `url('${songMetadata.thumbnail}')`;
+      }
+
       // 1. Fetch direct video stream URL
       const streamData = await KOTApi.fetchVideoStream(songId);
-      if (!streamData.success || !streamData.videoUrl) {
-        throw new Error(streamData.message || 'Stream URL error');
+      if (!streamData.success) {
+        throw new Error(streamData.message || streamData.error || 'Stream URL error');
       }
 
       currentVideo = {
@@ -138,8 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Save to History
       KOTStorage.saveToHistory(currentVideo);
 
-      // Set Video Source
-      video.src = streamData.videoUrl;
+      // Set Video Source (works with proxy range streamer or direct stream)
+      video.src = streamData.videoStreamUrl || streamData.directUrl || `/api/video-stream/${songId}`;
       video.load();
 
       // Initialize Sound Engine
