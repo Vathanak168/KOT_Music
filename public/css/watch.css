@@ -812,3 +812,67 @@
   align-items: center;
   gap: 4px;
 }
+
+/* Watch Settings Subpages (Quality & Speed Pickers) */
+.watch-settings-subpage {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.watch-settings-subpage.hidden {
+  display: none !important;
+}
+
+.watch-option-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.watch-option-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.watch-option-item.active {
+  background: rgba(139, 92, 246, 0.14);
+  color: var(--accent-purple);
+  font-weight: 700;
+}
+
+.watch-check {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--accent-purple);
+  min-width: 18px;
+  text-align: right;
+}
+
+.btn-watch-settings-back {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 1.6rem;
+  font-weight: 300;
+  cursor: pointer;
+  padding: 0 8px 0 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  transition: color var(--transition-fast);
+}
+
+.btn-watch-settings-back:hover {
+  color: var(--accent-purple);
+}
+
+.btn-watch-settings-back.hidden {
+  display: none !important;
+}

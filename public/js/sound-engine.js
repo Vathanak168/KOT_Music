@@ -128,8 +128,16 @@ const SoundEngine = {
   },
 
   isIOS() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const ua = navigator.userAgent || '';
+    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  },
+
+  isMobileOrWebView() {
+    const ua = navigator.userAgent || '';
+    const isIOS = this.isIOS();
+    const isWebView = /Telegram|FBAN|FBAV|Instagram|Line|WhatsApp|WebView|Android.*Version\/[0-9.]+|wv/i.test(ua);
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+    return isIOS || isWebView || isMobile;
   },
 
   init(element) {
@@ -143,7 +151,7 @@ const SoundEngine = {
       if (saved.custom) this.customSettings = { ...this.customSettings, ...saved.custom };
     }
 
-    if (this.isIOS()) {
+    if (this.isMobileOrWebView() || (element && element.tagName === 'VIDEO')) {
       this.initialized = true;
       this.applyPreset(this.currentPreset, false);
       return;
@@ -285,7 +293,7 @@ const SoundEngine = {
       this.mediaElement.playbackRate = p.speed;
     }
 
-    if (!this.audioCtx || this.isIOS()) {
+    if (!this.audioCtx || this.isMobileOrWebView()) {
       if (updateUi) this.syncUI();
       return;
     }

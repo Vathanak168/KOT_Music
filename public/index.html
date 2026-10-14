@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Noto+Sans+Khmer:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="/style.css?v=yt_video_v15">
+  <link rel="stylesheet" href="/style.css?v=yt_video_v26">
   <link rel="stylesheet" href="/css/sound-fx.css">
 </head>
 <body>
@@ -34,7 +34,7 @@
   <!-- Hardware Native Audio Player (iOS WebKit & Android Background Playback) -->
   <audio id="audioPlayer" preload="auto" playsinline webkit-playsinline="true" x-webkit-airplay="allow"></audio>
   <!-- Companion iOS Background Session Keep-Alive Loop -->
-  <audio id="silentKeepAlive" src="/silent.mp3" preload="auto" loop playsinline webkit-playsinline="true" style="display:none;"></audio>
+  <audio id="silentKeepAlive" src="/silent.mp3" preload="auto" loop playsinline webkit-playsinline="true" style="position:fixed;width:1px;height:1px;top:-999px;left:-999px;opacity:0.01;pointer-events:none;" aria-hidden="true"></audio>
 
   <div class="app-layout">
     <!-- Header Navigation -->
@@ -170,14 +170,6 @@
           <div class="section-title-wrap">
             <h2 id="sectionTitle" class="section-title">✨ ចម្រៀងណែនាំសម្រាប់អ្នក</h2>
             <span id="songsCountBadge" class="section-count">កំពុងដំណើរការ...</span>
-            <span id="activeCategoryPlayingBadge" class="active-category-pill hidden">
-              <span class="active-pill-dot"></span>
-              <span id="activeCategoryPlayingText">កំពុងចាក់បន្តក្នុង Vibe នេះ</span>
-            </span>
-            <div id="recommendedTasteNote" class="recommended-taste-note hidden">
-              <span class="taste-sparkle">🎯</span>
-              <span id="recommendedTasteText">ផ្អែកលើបទដែលអ្នកចូលចិត្តស្តាប់</span>
-            </div>
           </div>
 
           <div class="section-actions">
@@ -188,21 +180,6 @@
               <span>ចាក់ទាំងអស់</span>
             </button>
           </div>
-        </div>
-
-        <!-- YouTube Style: Playing Song Related Banner (Quick Access) -->
-        <div id="playingRelatedBanner" class="playing-related-banner hidden">
-          <div class="playing-related-left">
-            <span class="playing-pulse-dot"></span>
-            <span class="playing-related-tag">កំពុងចាក់:</span>
-            <span id="playingRelatedTitle" class="playing-related-title">បទចម្រៀង</span>
-          </div>
-          <button id="btnViewRelated" class="btn-view-related" title="មើលបទចម្រៀងស្រដៀងគ្នា">
-            <span>✨ មើលបទស្រដៀងគ្នា</span>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-          </button>
         </div>
 
         <!-- Songs Grid (Immediate Content) -->
@@ -1093,7 +1070,7 @@
           </div>
           <div class="yt-setting-info">
             <div class="yt-setting-label">គុណភាពវីដេអូ (Quality)</div>
-            <div class="yt-setting-sublabel" id="valYtQuality">Auto (720p HD)</div>
+            <div class="yt-setting-sublabel" id="valYtQuality">Auto (1080p HD)</div>
           </div>
           <div class="yt-setting-arrow">›</div>
         </div>
@@ -1168,8 +1145,20 @@
       <!-- Subpage: Quality Selector -->
       <div id="ytSettingsQualityPage" class="yt-settings-subpage hidden">
         <div class="yt-option-item active" data-quality="auto">
-          <span class="yt-option-text">Auto (ស្វ័យប្រវត្តិតាម Internet)</span>
+          <span class="yt-option-text">Auto (ស្វ័យប្រវត្តិតាម Internet - 1080p HD)</span>
           <span class="yt-check">✓</span>
+        </div>
+        <div class="yt-option-item" data-quality="4k">
+          <span class="yt-option-text">4K Ultra HD (2160p គុណភាពខ្ពស់បំផុត)</span>
+          <span class="yt-check"></span>
+        </div>
+        <div class="yt-option-item" data-quality="1440p">
+          <span class="yt-option-text">1440p 2K QHD (ច្បាស់ខ្លាំង)</span>
+          <span class="yt-check"></span>
+        </div>
+        <div class="yt-option-item" data-quality="1080p">
+          <span class="yt-option-text">1080p Full HD (ច្បាស់ត្រជាក់ភ្នែក)</span>
+          <span class="yt-check"></span>
         </div>
         <div class="yt-option-item" data-quality="720p">
           <span class="yt-option-text">720p HD (គុណភាពច្បាស់)</span>
@@ -1203,6 +1192,6 @@
     </div>
   </div>
 
-  <script src="/app.js?v=yt_video_v15"></script>
+  <script src="/app.js?v=yt_video_v26"></script>
 </body>
 </html>

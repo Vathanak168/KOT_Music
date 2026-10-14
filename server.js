@@ -162,13 +162,27 @@ async function searchYouTube(query, limit = 20) {
   return results;
 }
 
+// Helper: Staggered background prefetch (never competes with active user playback)
+function prefetchAudioSequentially(songIds) {
+  if (!Array.isArray(songIds) || songIds.length === 0) return;
+  setTimeout(async () => {
+    for (const id of songIds.slice(0, 2)) {
+      if (!id || streamCache.has(id)) continue;
+      try {
+        await extractAudioStreamUrl(id);
+      } catch (e) {}
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }, 1500);
+}
+
 // In-flight extraction promises map (prevents duplicate parallel yt-dlp processes on simultaneous Range requests)
 const inFlightExtractions = new Map();
 
 // Helper: Extract pure audio stream URL via yt-dlp with caching & stampede prevention
 function extractAudioStreamUrl(videoId) {
   const cached = streamCache.get(videoId);
-  if (cached && Date.now() - cached.timestamp < 1000 * 60 * 60 * 2) {
+  if (cached && Date.now() - cached.timestamp < 1000 * 60 * 60 * 6) {
     return Promise.resolve(cached.url);
   }
 
@@ -183,6 +197,8 @@ function extractAudioStreamUrl(videoId) {
       '--no-warnings',
       '--no-playlist',
       '--no-check-certificates',
+      '--extractor-args', 'youtube:player_client=android',
+      '--skip-download',
       '-g',
       '-f', 'ba[protocol=https]/ba/b',
       `https://www.youtube.com/watch?v=${videoId}`
@@ -238,7 +254,7 @@ function extractVideoStreamUrl(videoId, quality = 'auto') {
   } else if (q === '1080p' || q === 'fhd') {
     formatArg = 'bestvideo[protocol=https][height<=1080][ext=mp4]/bestvideo[protocol=https][height<=1080]/bestvideo/best';
   } else if (q === '720p' || q === 'hd') {
-    formatArg = 'bestvideo[protocol=https][height<=720][ext=mp4]/bestvideo[protocol=https][height<=720]/22/18/best';
+    formatArg = '22/bestvideo[protocol=https][height<=720][ext=mp4]/bestvideo[protocol=https][height<=720]/18/best';
   } else if (q === '480p') {
     formatArg = 'bestvideo[protocol=https][height<=480][ext=mp4]/bestvideo[protocol=https][height<=480]/18/best';
   } else if (q === '360p') {
@@ -246,8 +262,8 @@ function extractVideoStreamUrl(videoId, quality = 'auto') {
   } else if (q === '240p') {
     formatArg = 'bestvideo[protocol=https][height<=240]/18/best';
   } else {
-    // 'auto': prioritize high quality 1080p/720p HD for crisp video playback
-    formatArg = 'bestvideo[protocol=https][height<=1080][ext=mp4]/bestvideo[protocol=https][height<=1080]/22/18/best';
+    // 'auto': prioritize fast, smooth progressive MP4 (720p/360p with audio) for zero-stutter playback
+    formatArg = '22/18/best[protocol=https][ext=mp4]/best[ext=mp4]/best';
   }
 
   const extractionPromise = new Promise((resolve, reject) => {
@@ -256,6 +272,8 @@ function extractVideoStreamUrl(videoId, quality = 'auto') {
       '--no-warnings',
       '--no-playlist',
       '--no-check-certificates',
+      '--extractor-args', 'youtube:player_client=android',
+      '--skip-download',
       '-g',
       '-f', formatArg,
       `https://www.youtube.com/watch?v=${videoId}`
@@ -316,9 +334,8 @@ app.get('/api/search', async (req, res) => {
     const results = await searchYouTube(query, 20);
     res.json({ success: true, count: results.length, data: results });
     // Prefetch top 2 songs in background for instant playback
-    if (results.length > 0 && results[0]?.id) {
-      extractAudioStreamUrl(results[0].id).catch(() => {});
-      if (results[1]?.id) extractAudioStreamUrl(results[1].id).catch(() => {});
+    if (results.length > 0) {
+      prefetchAudioSequentially(results.map(r => r.id));
     }
   } catch (err) {
     console.error('Search error:', err.message);
@@ -460,10 +477,19 @@ app.get('/api/video-info/:id', async (req, res) => {
   const quality = (req.query.quality || 'auto').toLowerCase();
 
   try {
-    const videoData = await extractVideoStreamUrl(videoId, quality);
+    const videoDataPromise = extractVideoStreamUrl(videoId, quality);
+    const metaPromise = fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`)
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null);
+
+    const [videoData, meta] = await Promise.all([videoDataPromise, metaPromise]);
+
     res.json({
       success: true,
       id: videoId,
+      title: meta && meta.title ? meta.title : 'KOT Video',
+      channel: meta && meta.author_name ? meta.author_name : 'YouTube',
+      thumbnail: meta && meta.thumbnail_url ? meta.thumbnail_url : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
       quality: videoData.quality || quality,
       hasAudio: videoData.hasAudio,
       videoStreamUrl: `/api/video-stream/${videoId}?quality=${encodeURIComponent(quality)}`,
@@ -577,15 +603,15 @@ const CURATED_LISTS = {
 
 app.get('/api/trending', async (req, res) => {
   const category = req.query.category || 'khmer';
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 70, 16), 100);
   const query = CURATED_LISTS[category] || CURATED_LISTS.khmer;
 
   try {
-    const results = await searchYouTube(query, 16);
+    const results = await searchYouTube(query, limit);
     res.json({ success: true, category, data: results });
     // Prefetch top 2 songs in background for instant playback
-    if (results.length > 0 && results[0]?.id) {
-      extractAudioStreamUrl(results[0].id).catch(() => {});
-      if (results[1]?.id) extractAudioStreamUrl(results[1].id).catch(() => {});
+    if (results.length > 0) {
+      prefetchAudioSequentially(results.map(r => r.id));
     }
   } catch (err) {
     console.error('Trending fetch error:', err.message);
@@ -658,9 +684,8 @@ app.get('/api/related', async (req, res) => {
     res.json({ success: true, count: unique.length, data: unique });
 
     // Prefetch top 2 related songs in background for instant gapless next play
-    if (unique.length > 0 && unique[0]?.id) {
-      extractAudioStreamUrl(unique[0].id).catch(() => {});
-      if (unique[1]?.id) extractAudioStreamUrl(unique[1].id).catch(() => {});
+    if (unique.length > 0) {
+      prefetchAudioSequentially(unique.map(r => r.id));
     }
   } catch (err) {
     console.error('Related songs error:', err.message);
@@ -671,7 +696,8 @@ app.get('/api/related', async (req, res) => {
 // API: Personalized Recommendations based on listening history & favorite artists
 app.post('/api/recommendations', async (req, res) => {
   try {
-    const { history = [], favorites = [] } = req.body || {};
+    const { history = [], favorites = [], limit = 70 } = req.body || {};
+    const targetLimit = Math.min(Math.max(parseInt(limit) || 70, 20), 100);
 
     // Analyze user's favorite artists & genres
     const artistCounts = {};
@@ -690,7 +716,7 @@ app.post('/api/recommendations', async (req, res) => {
 
     const topArtists = Object.keys(artistCounts)
       .sort((a, b) => artistCounts[b] - artistCounts[a])
-      .slice(0, 4);
+      .slice(0, 5);
 
     let finalSongs = [];
     let isPersonalized = false;
@@ -698,7 +724,7 @@ app.post('/api/recommendations', async (req, res) => {
     if (topArtists.length > 0) {
       isPersonalized = true;
       // Fetch fresh songs for each top artist in parallel
-      const searches = topArtists.map(artist => searchYouTube(`${artist} popular songs`, 8));
+      const searches = topArtists.map(artist => searchYouTube(`${artist} popular songs`, 15));
       const searchResults = await Promise.allSettled(searches);
 
       const pool = [];
@@ -718,21 +744,35 @@ app.post('/api/recommendations', async (req, res) => {
       });
 
       // Shuffle slightly for organic YouTube-style feed
-      finalSongs = finalSongs.sort(() => 0.5 - Math.random()).slice(0, 20);
+      finalSongs = finalSongs.sort(() => 0.5 - Math.random());
     }
 
-    // Fallback or blend with curated trending if user is new or has short history
-    if (finalSongs.length < 12) {
-      const trending = await searchYouTube('បទចម្រៀងខ្មែរពេញនិយម VannDa G-Devith chill pop hits', 18);
+    // Fallback or blend with curated trending to reach full targetLimit (up to 70 videos)
+    if (finalSongs.length < targetLimit) {
+      const needed = targetLimit - finalSongs.length;
+      const trendingQueries = [
+        'បទចម្រៀងខ្មែរពេញនិយម 2026 VannDa G-Devith',
+        'khmer remix tiktok viral songs 2026',
+        'chill lofi khmer acoustic pop hits 2026'
+      ];
+      const perQuery = Math.max(Math.ceil(needed / trendingQueries.length) + 10, 25);
+      const trendingSearches = trendingQueries.map(q => searchYouTube(q, perQuery));
+      const trendingResults = await Promise.allSettled(trendingSearches);
+
       const seen = new Set(finalSongs.map(s => s.id));
-      trending.forEach(s => {
-        if (!seen.has(s.id)) {
-          seen.add(s.id);
-          finalSongs.push(s);
+      trendingResults.forEach(r => {
+        if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+          r.value.forEach(s => {
+            if (!seen.has(s.id) && finalSongs.length < targetLimit) {
+              seen.add(s.id);
+              finalSongs.push(s);
+            }
+          });
         }
       });
-      finalSongs = finalSongs.slice(0, 20);
     }
+
+    finalSongs = finalSongs.slice(0, targetLimit);
 
     res.json({
       success: true,
@@ -743,9 +783,8 @@ app.post('/api/recommendations', async (req, res) => {
     });
 
     // Prefetch top 2 songs
-    if (finalSongs.length > 0 && finalSongs[0]?.id) {
-      extractAudioStreamUrl(finalSongs[0].id).catch(() => {});
-      if (finalSongs[1]?.id) extractAudioStreamUrl(finalSongs[1].id).catch(() => {});
+    if (finalSongs.length > 0) {
+      prefetchAudioSequentially(finalSongs.map(r => r.id));
     }
   } catch (err) {
     console.error('Recommendations error:', err.message);

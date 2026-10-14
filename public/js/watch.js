@@ -55,10 +55,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const upnextBadge = document.getElementById('watchUpnextBadge');
   const chkAutoplay = document.getElementById('watchChkAutoplay');
 
+  // Audio Sync for High-Res (4K, 1440p, 1080p, 720p)
+  const audioSync = document.getElementById('watchAudioSync');
+
   // Settings Modal & Sound FX Modal
   const settingsModal = document.getElementById('watchSettingsModal');
   const settingsBackdrop = document.getElementById('watchSettingsBackdrop');
   const btnCloseSettings = document.getElementById('btnCloseWatchSettings');
+  const btnSettingsBack = document.getElementById('btnWatchSettingsBack');
+  const settingsTitle = document.getElementById('watchSettingsTitle');
+  const settingsMainMenu = document.getElementById('watchSettingsMainMenu');
+  const settingsQualityPage = document.getElementById('watchSettingsQualityPage');
+  const settingsSpeedPage = document.getElementById('watchSettingsSpeedPage');
   const itemSoundFx = document.getElementById('itemWatchSoundFx');
   const itemQuality = document.getElementById('itemWatchQuality');
   const itemSpeed = document.getElementById('itemWatchSpeed');
@@ -83,6 +91,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let isScrubbing = false;
   let videoLoop = false;
   let ambientEnabled = true;
+  let currentQuality = 'auto';
+  let currentSpeed = 1.0;
+  let isSeparateAudio = false;
+  let hasPrefetchedNext = false;
 
   // Initialize Autoplay from Storage
   const autoplay = KOTStorage.getAutoplay();
@@ -96,10 +108,23 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   }
 
+  // Quality display names
+  const qualityNames = {
+    auto: 'Auto (1080p HD)',
+    '4k': '4K Ultra HD',
+    '1440p': '1440p 2K QHD',
+    '1080p': '1080p Full HD',
+    '720p': '720p HD',
+    '480p': '480p',
+    '360p': '360p',
+    '240p': '240p'
+  };
+
   // Load and Play Video
-  async function loadVideo(songId, songMetadata = null) {
+  async function loadVideo(songId, songMetadata = null, startTime = 0, autoPlay = true) {
     if (!songId) return;
     if (bufferingSpinner) bufferingSpinner.classList.remove('hidden');
+    hasPrefetchedNext = false;
 
     try {
       // Update optimistic UI if metadata is provided
@@ -111,8 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ambientGlow && songMetadata.thumbnail) ambientGlow.style.backgroundImage = `url('${songMetadata.thumbnail}')`;
       }
 
-      // 1. Fetch direct video stream URL
-      const streamData = await KOTApi.fetchVideoStream(songId);
+      // 1. Fetch direct video stream URL with user-selected quality
+      const streamData = await KOTApi.fetchVideoStream(songId, currentQuality);
       if (!streamData.success) {
         throw new Error(streamData.message || streamData.error || 'Stream URL error');
       }
@@ -131,6 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (channelNameEl) channelNameEl.textContent = currentVideo.artist;
       if (channelAvatar) channelAvatar.src = currentVideo.thumbnail;
       if (ambientGlow) ambientGlow.style.backgroundImage = `url('${currentVideo.thumbnail}')`;
+      if (video) video.poster = currentVideo.thumbnail;
 
       // Update URL
       const newUrl = `/watch?v=${songId}`;
@@ -147,19 +173,51 @@ document.addEventListener('DOMContentLoaded', () => {
       // Save to History
       KOTStorage.saveToHistory(currentVideo);
 
-      // Set Video Source (works with proxy range streamer or direct stream)
-      video.src = streamData.videoStreamUrl || streamData.directUrl || `/api/video-stream/${songId}`;
+      // 2. Set Video Source and Audio Sync
+      isSeparateAudio = !streamData.hasAudio;
+      video.src = streamData.videoStreamUrl || streamData.directUrl || `/api/video-stream/${songId}?quality=${currentQuality}`;
+      video.playbackRate = currentSpeed;
+      video.loop = videoLoop;
+
+      if (isSeparateAudio && audioSync) {
+        audioSync.src = streamData.audioStreamUrl || `/api/stream/${songId}`;
+        audioSync.playbackRate = currentSpeed;
+        audioSync.loop = videoLoop;
+        video.muted = true; // Video plays mute while audioSync provides crystal clear Web Audio DSP
+        audioSync.load();
+        SoundEngine.init(audioSync);
+      } else {
+        video.muted = false;
+        if (audioSync) {
+          audioSync.pause();
+          audioSync.removeAttribute('src');
+        }
+        SoundEngine.init(video);
+      }
+
       video.load();
 
-      // Initialize Sound Engine
-      SoundEngine.init(video);
-
-      // Attempt Playback
-      try {
-        await video.play();
-      } catch (err) {
-        console.warn('Autoplay gesture required:', err);
+      // Seek to initial offset if reloading quality
+      function onLoadedMetadata() {
+        if (startTime > 0) {
+          try {
+            video.currentTime = startTime;
+            if (isSeparateAudio && audioSync) audioSync.currentTime = startTime;
+          } catch (e) {}
+        }
+        if (autoPlay) {
+          video.play().catch(err => {
+            console.warn('Autoplay gesture required on mobile:', err.message);
+            updatePlayPauseIcons();
+          });
+          if (isSeparateAudio && audioSync) {
+            audioSync.play().catch(() => {});
+          }
+        }
+        updatePlayPauseIcons();
+        video.removeEventListener('loadedmetadata', onLoadedMetadata);
       }
+      video.addEventListener('loadedmetadata', onLoadedMetadata);
 
       // Fetch Related Tracks
       fetchRelated(currentVideo);
@@ -274,10 +332,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Play / Pause Toggle
   function togglePlay() {
     if (video.paused) {
-      video.play();
+      video.play().catch(err => {
+        console.warn('Play gesture required:', err.message);
+        updatePlayPauseIcons();
+      });
     } else {
       video.pause();
     }
+    updatePlayPauseIcons();
   }
 
   // Update Play/Pause Icons
@@ -356,12 +418,60 @@ document.addEventListener('DOMContentLoaded', () => {
       const bufPct = (bufferedEnd / dur) * 100;
       scrubberBuffer.style.width = `${bufPct}%`;
     }
+
+    // Audio-Video synchronization drift correction for 4K / 1080p separate streams
+    if (isSeparateAudio && audioSync && !audioSync.paused && !video.paused) {
+      if (Math.abs(audioSync.currentTime - cur) > 0.15) {
+        audioSync.currentTime = cur;
+      }
+    }
+
+    // Zero-Delay Prefetching: When video reaches 75% progress, prewarm next song stream in background
+    if (pct > 75 && !hasPrefetchedNext && relatedVideos.length > 0) {
+      hasPrefetchedNext = true;
+      KOTApi.prefetchSong(relatedVideos[0].id);
+    }
+  });
+
+  // Audio Sync Event Handlers
+  video.addEventListener('play', () => {
+    if (isSeparateAudio && audioSync && audioSync.paused) {
+      audioSync.play().catch(() => {});
+    }
+  });
+
+  video.addEventListener('pause', () => {
+    if (isSeparateAudio && audioSync && !audioSync.paused) {
+      audioSync.pause();
+    }
+  });
+
+  video.addEventListener('seeking', () => {
+    if (isSeparateAudio && audioSync) {
+      audioSync.currentTime = video.currentTime;
+    }
+  });
+
+  video.addEventListener('seeked', () => {
+    if (isSeparateAudio && audioSync) {
+      audioSync.currentTime = video.currentTime;
+      if (!video.paused && audioSync.paused) audioSync.play().catch(() => {});
+    }
+  });
+
+  video.addEventListener('ratechange', () => {
+    if (isSeparateAudio && audioSync) {
+      audioSync.playbackRate = video.playbackRate;
+    }
   });
 
   video.addEventListener('ended', () => {
+    if (isSeparateAudio && audioSync) audioSync.pause();
     if (videoLoop) {
       video.currentTime = 0;
+      if (isSeparateAudio && audioSync) audioSync.currentTime = 0;
       video.play();
+      if (isSeparateAudio && audioSync) audioSync.play();
       return;
     }
 
@@ -454,6 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openSettings() {
     if (settingsModal) settingsModal.classList.remove('hidden');
+    showSettingsMainMenu();
     // Sync active preset name
     if (valActivePreset && SoundEngine.presets[SoundEngine.currentPreset]) {
       valActivePreset.textContent = SoundEngine.presets[SoundEngine.currentPreset].name;
@@ -462,7 +573,93 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function closeSettings() {
     if (settingsModal) settingsModal.classList.add('hidden');
+    showSettingsMainMenu();
   }
+
+  function showSettingsMainMenu() {
+    if (settingsMainMenu) settingsMainMenu.classList.remove('hidden');
+    if (settingsQualityPage) settingsQualityPage.classList.add('hidden');
+    if (settingsSpeedPage) settingsSpeedPage.classList.add('hidden');
+    if (btnSettingsBack) btnSettingsBack.classList.add('hidden');
+    if (settingsTitle) settingsTitle.textContent = '⚙️ ការកំណត់ទូទៅ (Settings)';
+  }
+
+  // Back button inside settings
+  if (btnSettingsBack) {
+    btnSettingsBack.addEventListener('click', () => {
+      showSettingsMainMenu();
+    });
+  }
+
+  // Open Quality Page
+  if (itemQuality) {
+    itemQuality.addEventListener('click', () => {
+      if (settingsMainMenu) settingsMainMenu.classList.add('hidden');
+      if (settingsQualityPage) settingsQualityPage.classList.remove('hidden');
+      if (btnSettingsBack) btnSettingsBack.classList.remove('hidden');
+      if (settingsTitle) settingsTitle.textContent = 'គុណភាពវីដេអូ (Quality)';
+    });
+  }
+
+  // Quality Option Clicked
+  const qualityOptions = document.querySelectorAll('#watchSettingsQualityPage .watch-option-item');
+  qualityOptions.forEach(opt => {
+    opt.addEventListener('click', () => {
+      const q = opt.dataset.quality;
+      currentQuality = q;
+
+      // Update checks
+      qualityOptions.forEach(o => {
+        const isThis = o === opt;
+        o.classList.toggle('active', isThis);
+        const check = o.querySelector('.watch-check');
+        if (check) check.textContent = isThis ? '✓' : '';
+      });
+
+      if (valQuality) valQuality.textContent = qualityNames[q] || q;
+
+      // Reload video preserving current playback position
+      if (currentVideo && currentVideo.id) {
+        const curTime = video.currentTime || 0;
+        const wasPlaying = !video.paused;
+        loadVideo(currentVideo.id, currentVideo, curTime, wasPlaying);
+      }
+
+      closeSettings();
+    });
+  });
+
+  // Open Speed Page
+  if (itemSpeed) {
+    itemSpeed.addEventListener('click', () => {
+      if (settingsMainMenu) settingsMainMenu.classList.add('hidden');
+      if (settingsSpeedPage) settingsSpeedPage.classList.remove('hidden');
+      if (btnSettingsBack) btnSettingsBack.classList.remove('hidden');
+      if (settingsTitle) settingsTitle.textContent = 'ល្បឿនលេង (Playback Speed)';
+    });
+  }
+
+  // Speed Option Clicked
+  const speedOptions = document.querySelectorAll('#watchSettingsSpeedPage .watch-option-item');
+  speedOptions.forEach(opt => {
+    opt.addEventListener('click', () => {
+      const spd = parseFloat(opt.dataset.speed);
+      currentSpeed = spd;
+      video.playbackRate = spd;
+      if (audioSync) audioSync.playbackRate = spd;
+
+      // Update checks
+      speedOptions.forEach(o => {
+        const isThis = o === opt;
+        o.classList.toggle('active', isThis);
+        const check = o.querySelector('.watch-check');
+        if (check) check.textContent = isThis ? '✓' : '';
+      });
+
+      if (valSpeed) valSpeed.textContent = spd === 1.0 ? 'ធម្មតា (1.0x)' : `${spd}x`;
+      closeSettings();
+    });
+  });
 
   // Item Sound FX inside Settings -> Opens Sound FX Modal
   if (itemSoundFx) {
@@ -539,8 +736,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Switch to MP3 Button -> Opens main page in pure audio mode!
   if (btnSwitchMp3) {
     btnSwitchMp3.addEventListener('click', () => {
+      const time = Math.floor(video ? video.currentTime : 0);
       if (currentVideo && currentVideo.id) {
-        window.location.href = `/?play=${encodeURIComponent(currentVideo.id)}`;
+        window.location.href = `/?play=${encodeURIComponent(currentVideo.id)}&t=${time}`;
       } else {
         window.location.href = '/';
       }
@@ -593,7 +791,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Start with Initial Video or fallback to Trending
   if (initialVideoId) {
-    loadVideo(initialVideoId);
+    const startTime = parseFloat(urlParams.get('t') || '0');
+    loadVideo(initialVideoId, null, startTime);
   } else {
     // If no video parameter in URL, fetch first trending song
     KOTApi.fetchTrending('khmer').then(data => {

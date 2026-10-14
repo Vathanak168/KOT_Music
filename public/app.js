@@ -115,11 +115,18 @@ const valYtAmbient = document.getElementById('valYtAmbient');
 const itemYtPipAction = document.getElementById('itemYtPipAction');
 const itemYtSwitchAudio = document.getElementById('itemYtSwitchAudio');
 
-// iOS WebKit Detection (iPhone, iPad, iPod, or iPadOS desktop mode)
+// iOS & In-App WebView (Telegram, Instagram, FB, WhatsApp) Detection
 const isIOS = (() => {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 })();
+
+const isWebView = (() => {
+  const ua = navigator.userAgent || '';
+  return /Telegram|FBAN|FBAV|Instagram|Line|WhatsApp|WebView|Android.*Version\/[0-9.]+|wv/i.test(ua);
+})();
+
+const isMobileOrWebView = isIOS || isWebView || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 let silentAudioStarted = false;
 function ensureSilentKeepAlive() {
@@ -138,6 +145,24 @@ function ensureSilentKeepAlive() {
     }
   } catch (e) {}
 }
+
+if (silentAudio) {
+  silentAudio.addEventListener('ended', () => {
+    try {
+      silentAudio.currentTime = 0;
+      silentAudio.play().catch(() => {});
+    } catch (e) {}
+  });
+}
+
+// Pre-unlock silent background keep-alive on the very first user interaction
+const unlockKeepAlive = () => {
+  ensureSilentKeepAlive();
+};
+document.addEventListener('pointerdown', unlockKeepAlive, { passive: true, once: true });
+document.addEventListener('touchstart', unlockKeepAlive, { passive: true, once: true });
+document.addEventListener('click', unlockKeepAlive, { passive: true, once: true });
+
 
 // Header & Controls
 const btnQueueToggle = document.getElementById('btnQueueToggle');
@@ -306,10 +331,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load initial Recommended Feed for the user (YouTube style)
   loadTrending('recommended');
 
-  // Handle ?play=[id] parameter from Watch page switch
+  // Handle ?play=[id]&t=[seconds] parameter from Watch page switch
   const urlParams = new URLSearchParams(window.location.search);
   const playId = urlParams.get('play');
+  const playTime = parseFloat(urlParams.get('t')) || 0;
   if (playId) {
+    if (playTime > 0) {
+      audio.addEventListener('loadedmetadata', function onLoaded() {
+        try { audio.currentTime = playTime; } catch (e) {}
+        audio.removeEventListener('loadedmetadata', onLoaded);
+      }, { once: true });
+    }
     fetch(`/api/related?id=${encodeURIComponent(playId)}`)
       .then(r => r.json())
       .then(d => {
@@ -352,19 +384,39 @@ function setupMediaSession() {
   // Define Lock Screen Action Handlers
   try {
     navigator.mediaSession.setActionHandler('play', () => {
+      ensureSilentKeepAlive();
       playSong();
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+      }
     });
 
     navigator.mediaSession.setActionHandler('pause', () => {
       pauseSong();
+      ensureSilentKeepAlive();
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+      updatePositionState();
+    });
+
+    navigator.mediaSession.setActionHandler('stop', () => {
+      pauseSong();
+      ensureSilentKeepAlive();
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+      updatePositionState();
     });
 
     navigator.mediaSession.setActionHandler('previoustrack', () => {
+      ensureSilentKeepAlive();
       playPrevTrack();
     });
 
     navigator.mediaSession.setActionHandler('nexttrack', () => {
-      playNextTrack();
+      ensureSilentKeepAlive();
+      playNextTrack(true);
     });
 
     navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -464,10 +516,8 @@ function setupAudioListeners() {
     state.isBuffering = false;
     state.isPlaying = true;
     updatePlayPauseUI();
-    // Stop redundant silent audio decoding loop to save iPhone CPU & battery
-    if (silentAudio && !silentAudio.paused) {
-      try { silentAudio.pause(); } catch(e) {}
-    }
+    // Maintain silent audio keepalive loop so iOS/Android Lock Screen session stays active
+    ensureSilentKeepAlive();
     // Prefetch next track in queue for instant 0ms playback
     prefetchNextTrack();
   });
@@ -486,9 +536,12 @@ function setupAudioListeners() {
     state.isPlaying = false;
     state.isBuffering = false;
     updatePlayPauseUI();
+    // Keep iOS background audio session active so Lock Screen controls NEVER disappear
+    ensureSilentKeepAlive();
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'paused';
     }
+    updatePositionState();
   });
 
   let lastPositionUpdateTime = 0;
@@ -528,6 +581,7 @@ function setupAudioListeners() {
 
   // Track ended: immediately transition to preserve iOS background audio token
   audio.addEventListener('ended', () => {
+    ensureSilentKeepAlive();
     if (state.repeatMode === 'one') {
       audio.currentTime = 0;
       audio.play().catch(console.error);
@@ -678,17 +732,18 @@ const SoundEngine = {
   init() {
     if (this.initialized) return;
     try {
-      // CRITICAL FOR IOS: On iOS Safari/WebKit, routing <audio> into createMediaElementSource
-      // causes WebKit to immediately suspend AudioContext upon lock screen or app switching,
-      // terminating background playback.
-      // On iOS devices, <audio> plays directly to hardware so Lock Screen playback is 100% uninterrupted!
-      if (isIOS) {
+      // CRITICAL FOR IOS, TELEGRAM & MOBILE WEBVIEWS:
+      // In mobile browsers and inside in-app WebViews (Telegram, Instagram, etc.),
+      // routing <audio> into createMediaElementSource causes buffer underruns,
+      // background audio suspension, and choppy/stuttering audio.
+      // Playing <audio> directly to native hardware decoders guarantees 100% stutter-free crystal clear audio!
+      if (isMobileOrWebView) {
         this.initialized = true;
         state.visualizerInitialized = true;
         state.dataArray = new Uint8Array(28);
         this.loadSettings();
         this.applyPreset(this.currentPreset, false);
-        console.log('KOT Music: iOS Direct Hardware Audio Mode active (Lock Screen Guaranteed)');
+        console.log('KOT Music: Direct Hardware Audio Mode active (Telegram & Mobile Stutter-Free)');
         return;
       }
 
@@ -866,6 +921,7 @@ const SoundEngine = {
       this.setSpeed(p.speed);
     } else {
       audio.playbackRate = p.speed;
+      if (videoPlayer) videoPlayer.playbackRate = p.speed;
     }
 
     updateSoundFxUI(presetKey, p);
@@ -936,6 +992,7 @@ const SoundEngine = {
     const num = parseFloat(val);
     this.customSettings.speed = num;
     audio.playbackRate = num;
+    if (videoPlayer) videoPlayer.playbackRate = num;
     labelSpeedVal.textContent = num.toFixed(2) + 'x';
   },
 
@@ -1173,35 +1230,59 @@ async function playSongObject(song, addToQueueList = true) {
   // Save to listen history for personalized recommendations
   saveToListenHistory(song);
 
-  // Fetch YouTube-style Up Next & Related recommendations
-  fetchRelatedSongs(song);
+  // Defer fetching related songs so active audio stream has 100% of CPU and network bandwidth!
+  if (state.relatedFetchTimer) clearTimeout(state.relatedFetchTimer);
+  state.relatedFetchTimer = setTimeout(() => {
+    if (state.currentSong?.id === song.id) {
+      fetchRelatedSongs(song);
+    }
+  }, 2500);
 
   // If in MP4 Video Mode, load and play the video
   if (state.mediaMode === 'video') {
+    if (fullPlayerModal) {
+      fullPlayerModal.classList.add('mode-video');
+      fullPlayerModal.classList.remove('mode-audio');
+    }
     if (audio) audio.pause();
     if (audioStageWrap) audioStageWrap.classList.add('hidden');
     if (videoStageWrap) videoStageWrap.classList.remove('hidden');
     loadAndPlayVideo(song, 0, true);
   } else {
+    if (fullPlayerModal) {
+      fullPlayerModal.classList.add('mode-audio');
+      fullPlayerModal.classList.remove('mode-video');
+    }
     if (videoPlayer) videoPlayer.pause();
     if (videoStageWrap) videoStageWrap.classList.add('hidden');
     if (audioStageWrap) audioStageWrap.classList.remove('hidden');
 
-    // Set audio source to direct stream endpoint
+    // Set audio source to direct stream endpoint (NEVER call audio.load() on background transitions)
     audio.src = `/api/stream/${song.id}`;
-    audio.load();
 
-    // Resume AudioContext only on non-iOS
-    if (!isIOS && state.audioCtx && state.audioCtx.state === 'suspended') {
+    // Update MediaSession immediately so iOS & Android lock screen displays playing state
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'playing';
+    }
+
+    // Resume AudioContext only on non-mobile/non-webview
+    if (!isMobileOrWebView && state.audioCtx && state.audioCtx.state === 'suspended') {
       try {
         state.audioCtx.resume().catch(() => {});
       } catch (e) {}
     }
 
-    try {
-      await audio.play();
-    } catch (err) {
-      console.warn('Playback gesture requirement or error:', err.message);
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        state.isPlaying = true;
+        updatePlayPauseUI();
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'playing';
+        }
+      }).catch((err) => {
+        console.warn('Playback gesture requirement or error:', err.message);
+      });
     }
   }
 }
@@ -1240,7 +1321,7 @@ function playSong() {
   }
   ensureSilentKeepAlive();
   if (audio.src) {
-    if (!isIOS && state.audioCtx && state.audioCtx.state === 'suspended') {
+    if (!isMobileOrWebView && state.audioCtx && state.audioCtx.state === 'suspended') {
       try {
         state.audioCtx.resume().catch(() => {});
       } catch (e) {}
@@ -1255,6 +1336,7 @@ function pauseSong() {
     return;
   }
   audio.pause();
+  ensureSilentKeepAlive();
 }
 
 function togglePlay() {
@@ -1267,6 +1349,17 @@ function togglePlay() {
 }
 
 function playNextTrack(isAutoNext = false) {
+  // Always ensure silent keepalive so the iOS background audio session is not dropped
+  ensureSilentKeepAlive();
+
+  // If queue has 1 or fewer items, replenish from current feed/category songsList (70 songs!)
+  if (state.queue.length <= 1 && state.songsList && state.songsList.length > 1) {
+    const curSongId = state.currentSong?.id;
+    state.queue = [...state.songsList];
+    const foundIdx = state.queue.findIndex(s => s.id === curSongId);
+    state.currentIndex = foundIdx !== -1 ? foundIdx : 0;
+  }
+
   if (state.queue.length === 0 && (!state.relatedSongs || state.relatedSongs.length === 0)) return;
 
   if (state.isShuffled && state.queue.length > 0) {
@@ -1295,12 +1388,15 @@ function playNextTrack(isAutoNext = false) {
     }
   }
 
-  if (state.repeatMode === 'all' || !isAutoNext) {
-    if (state.queue.length > 0) {
-      state.currentIndex = 0;
-      const nextSong = state.queue[state.currentIndex];
-      playSongObject(nextSong, false);
-    }
+  // Continuous loop: loop back to index 0 of current queue or songsList so music NEVER stops
+  if (state.queue.length > 0) {
+    state.currentIndex = 0;
+    const nextSong = state.queue[state.currentIndex];
+    playSongObject(nextSong, false);
+  } else if (state.songsList && state.songsList.length > 0) {
+    state.queue = [...state.songsList];
+    state.currentIndex = 0;
+    playSongObject(state.queue[0], false);
   }
 }
 
@@ -1554,24 +1650,13 @@ async function loadRecommendations(forceFresh = false) {
 
   state.userTasteArtists = topArtists;
 
-  // Update Taste Note UI
-  if (recommendedTasteNote && recommendedTasteText) {
-    if (topArtists.length > 0) {
-      recommendedTasteText.textContent = `យោងតាមបទដែលអ្នកចូលចិត្តស្តាប់ (${topArtists.slice(0, 3).join(', ')})`;
-      recommendedTasteNote.classList.remove('hidden');
-    } else {
-      recommendedTasteText.textContent = 'ផ្អែកលើបទចម្រៀងពេញនិយម & ល្បីៗប្រចាំថ្ងៃ';
-      recommendedTasteNote.classList.remove('hidden');
-    }
-  }
-
-  // Check temporary session cache
+  // Check temporary session cache (ensure at least 70 songs are cached)
   if (!forceFresh) {
     const cached = getCachedCategorySongs('recommended');
-    if (cached && cached.length > 0) {
+    if (cached && cached.length >= 70) {
       state.songsList = cached;
       renderSongCards(cached);
-      songsCountBadge.textContent = `${cached.length} បទ (សម្រាប់អ្នក)`;
+      songsCountBadge.textContent = `${cached.length} បទ`;
       prefetchUpcomingSongs(cached);
       return;
     }
@@ -1585,9 +1670,9 @@ async function loadRecommendations(forceFresh = false) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        history: state.listenHistory.slice(0, 20),
-        favorites: state.favorites.slice(0, 20),
-        limit: 24
+        history: state.listenHistory.slice(0, 30),
+        favorites: state.favorites.slice(0, 30),
+        limit: 70
       })
     });
     const data = await res.json();
@@ -1596,7 +1681,7 @@ async function loadRecommendations(forceFresh = false) {
       state.songsList = data.data;
       setCachedCategorySongs('recommended', data.data);
       renderSongCards(data.data);
-      songsCountBadge.textContent = `${data.data.length} បទ (សម្រាប់អ្នក)`;
+      songsCountBadge.textContent = `${data.data.length} បទ`;
       prefetchUpcomingSongs(data.data);
     } else {
       // Fallback to trending
@@ -1792,10 +1877,10 @@ async function loadTrending(category = 'recommended') {
 
   // 1. Instant rendering from Temporary Session Cache (0ms delay, auto-purged on close)
   const cachedSongs = getCachedCategorySongs(category);
-  if (cachedSongs && cachedSongs.length > 0) {
+  if (cachedSongs && cachedSongs.length >= 70) {
     state.songsList = cachedSongs;
     renderSongCards(cachedSongs);
-    songsCountBadge.textContent = `${cachedSongs.length} បទ (បណ្ដោះអាសន្ន)`;
+    songsCountBadge.textContent = `${cachedSongs.length} បទ`;
     prefetchUpcomingSongs(cachedSongs);
     return;
   }
@@ -1805,7 +1890,7 @@ async function loadTrending(category = 'recommended') {
   songsCountBadge.textContent = 'កំពុងទាញយក...';
 
   try {
-    const res = await fetch(`/api/trending?category=${category}`);
+    const res = await fetch(`/api/trending?category=${category}&limit=70`);
     const data = await res.json();
 
     if (data.success && data.data && data.data.length > 0) {
@@ -1903,7 +1988,7 @@ function renderSongCards(songs) {
       state.currentIndex = clickedIdx !== -1 ? clickedIdx : 0;
       playSongObject(song, false);
       updateContextBadges();
-      renderQueueList();
+      updateQueueBadge();
     });
 
     // Add to Queue with instant luxury check feedback
@@ -2297,14 +2382,15 @@ function renderFavList() {
 let suggestionDebounceTimer;
 function fetchSuggestions(query) {
   clearTimeout(suggestionDebounceTimer);
-  if (!query || query.trim().length < 2) {
+  const trimmed = (query || '').trim();
+  if (!trimmed) {
     suggestionsList.classList.add('hidden');
     return;
   }
 
   suggestionDebounceTimer = setTimeout(async () => {
     try {
-      const res = await fetch(`/api/suggestions?q=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/suggestions?q=${encodeURIComponent(trimmed)}`);
       const data = await res.json();
       if (data.suggestions && data.suggestions.length > 0) {
         renderSuggestions(data.suggestions);
@@ -2314,7 +2400,7 @@ function fetchSuggestions(query) {
     } catch (e) {
       suggestionsList.classList.add('hidden');
     }
-  }, 200);
+  }, 100);
 }
 
 function renderSuggestions(list) {
@@ -2326,11 +2412,16 @@ function renderSuggestions(list) {
       <span class="suggestion-icon">🔍</span>
       <span>${escapeHtml(item)}</span>
     `;
-    li.addEventListener('click', () => {
+    const chooseItem = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       searchInput.value = item;
+      btnSearchClear.classList.remove('hidden');
       suggestionsList.classList.add('hidden');
       searchSongs(item);
-    });
+    };
+    li.addEventListener('pointerdown', chooseItem);
+    li.addEventListener('click', chooseItem);
     suggestionsList.appendChild(li);
   });
   suggestionsList.classList.remove('hidden');
@@ -2355,6 +2446,14 @@ function setupEventListeners() {
     fetchSuggestions(val);
   });
 
+  // Re-show suggestions on focus if query exists
+  searchInput.addEventListener('focus', () => {
+    const val = searchInput.value.trim();
+    if (val) {
+      fetchSuggestions(val);
+    }
+  });
+
   // Clear search
   btnSearchClear.addEventListener('click', () => {
     searchInput.value = '';
@@ -2363,12 +2462,18 @@ function setupEventListeners() {
     searchInput.focus();
   });
 
-  // Hide suggestions when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.search-box-wrapper')) {
+  // Hide suggestions when clicking outside search section or scrolling
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('.search-section-wrap')) {
       suggestionsList.classList.add('hidden');
     }
   });
+
+  window.addEventListener('scroll', () => {
+    if (suggestionsList && !suggestionsList.classList.contains('hidden')) {
+      suggestionsList.classList.add('hidden');
+    }
+  }, { passive: true });
 
   // Category Tabs
   categoryChips.forEach(chip => {
@@ -2759,38 +2864,73 @@ function setupEventListeners() {
     });
   }
 
-  // Touch Swipe Gestures for Mobile Fullscreen Player Sheet
+  // Native Mobile YouTube-Style Swipe Down to Minimize
   let sheetTouchStartY = 0;
-  let sheetTouchCurrentY = 0;
+  let sheetTouchStartX = 0;
+  let isDraggingSheet = false;
   const fullPlayerContainer = document.querySelector('.full-player-container');
 
   if (fullPlayerModal && fullPlayerContainer) {
     fullPlayerModal.addEventListener('touchstart', (e) => {
-      if (e.target.closest('input[type="range"]')) return;
-      sheetTouchStartY = e.touches[0].clientY;
-      sheetTouchCurrentY = sheetTouchStartY;
+      // Don't intercept sliders, interactive buttons, or when scrolled down inside Up Next
+      if (e.target.closest('input[type="range"]') || e.target.closest('button') || e.target.closest('.chip-item')) return;
+      if (fullPlayerModal.scrollTop > 5) return;
+
+      const touch = e.touches[0];
+      sheetTouchStartY = touch.clientY;
+      sheetTouchStartX = touch.clientX;
+      isDraggingSheet = false;
     }, { passive: true });
 
     fullPlayerModal.addEventListener('touchmove', (e) => {
-      if (e.target.closest('input[type="range"]')) return;
-      sheetTouchCurrentY = e.touches[0].clientY;
-      const deltaY = sheetTouchCurrentY - sheetTouchStartY;
-      if (deltaY > 0) {
-        fullPlayerContainer.style.transform = `translateY(${Math.min(deltaY * 0.7, 260)}px)`;
+      if (!sheetTouchStartY) return;
+      if (fullPlayerModal.scrollTop > 5) return;
+
+      const touch = e.touches[0];
+      const deltaY = touch.clientY - sheetTouchStartY;
+      const deltaX = Math.abs(touch.clientX - sheetTouchStartX);
+
+      // Only drag down if moving downwards and more vertical than horizontal
+      if (deltaY > 10 && deltaY > deltaX) {
+        isDraggingSheet = true;
+        const translateY = Math.max(0, deltaY * 0.85);
+        fullPlayerContainer.style.transform = `translateY(${translateY}px)`;
         fullPlayerContainer.style.transition = 'none';
+        fullPlayerModal.style.backgroundColor = `rgba(7, 9, 19, ${Math.max(0.3, 1 - deltaY / 450)})`;
       }
     }, { passive: true });
 
     fullPlayerModal.addEventListener('touchend', (e) => {
-      const deltaY = sheetTouchCurrentY - sheetTouchStartY;
-      fullPlayerContainer.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
-      if (deltaY > 90) {
-        minimizeFullPlayer();
-        if (navigator.vibrate) navigator.vibrate(10);
+      if (!isDraggingSheet) {
+        sheetTouchStartY = 0;
+        return;
       }
-      fullPlayerContainer.style.transform = '';
+      isDraggingSheet = false;
+      const deltaY = (e.changedTouches[0]?.clientY || 0) - sheetTouchStartY;
+      fullPlayerContainer.style.transition = 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)';
+      fullPlayerModal.style.transition = 'background-color 0.28s ease';
+
+      if (deltaY > 80) {
+        fullPlayerContainer.style.transform = 'translateY(100vh)';
+        fullPlayerModal.style.backgroundColor = 'transparent';
+        if (navigator.vibrate) navigator.vibrate(10);
+        setTimeout(() => {
+          minimizeFullPlayer();
+          fullPlayerContainer.style.transform = '';
+          fullPlayerContainer.style.transition = '';
+          fullPlayerModal.style.backgroundColor = '';
+          fullPlayerModal.style.transition = '';
+        }, 260);
+      } else {
+        fullPlayerContainer.style.transform = 'translateY(0)';
+        fullPlayerModal.style.backgroundColor = '';
+        setTimeout(() => {
+          fullPlayerContainer.style.transform = '';
+          fullPlayerContainer.style.transition = '';
+          fullPlayerModal.style.transition = '';
+        }, 280);
+      }
       sheetTouchStartY = 0;
-      sheetTouchCurrentY = 0;
     });
   }
 
@@ -2874,8 +3014,8 @@ function updateVolumeIcon(vol) {
 
 function openFullPlayer() {
   if (fullPlayerModal) {
-    fullPlayerModal.classList.remove('floating-mini-mode');
     fullPlayerModal.classList.remove('hidden');
+    fullPlayerModal.style.transform = '';
     document.body.style.overflow = 'hidden';
   }
 
@@ -2893,12 +3033,20 @@ function openFullPlayer() {
   }
 
   if (isVideo) {
+    if (fullPlayerModal) {
+      fullPlayerModal.classList.add('mode-video');
+      fullPlayerModal.classList.remove('mode-audio');
+    }
     if (audioStageWrap) audioStageWrap.classList.add('hidden');
     if (videoStageWrap) videoStageWrap.classList.remove('hidden');
     if (state.currentSong && ytOverlayTitle) {
       ytOverlayTitle.textContent = state.currentSong.title;
     }
   } else {
+    if (fullPlayerModal) {
+      fullPlayerModal.classList.add('mode-audio');
+      fullPlayerModal.classList.remove('mode-video');
+    }
     if (videoStageWrap) videoStageWrap.classList.add('hidden');
     if (audioStageWrap) audioStageWrap.classList.remove('hidden');
     if (state.isPlaying && !state.isBuffering && audio.currentTime > 0) {
@@ -2910,34 +3058,22 @@ function openFullPlayer() {
 }
 
 function minimizeFullPlayer() {
-  if (state.mediaMode === 'video' && videoPlayer && !videoPlayer.paused) {
-    // Dock to floating mini player (Image 3)
-    if (fullPlayerModal) {
-      fullPlayerModal.classList.add('floating-mini-mode');
-      fullPlayerModal.classList.remove('hidden');
-      document.body.style.overflow = '';
-    }
-  } else {
-    closeFullPlayer();
-  }
+  closeFullPlayer();
 }
 
 function closeFloatingVideo() {
-  if (fullPlayerModal) {
-    fullPlayerModal.classList.remove('floating-mini-mode');
-    fullPlayerModal.classList.add('hidden');
-  }
+  closeFullPlayer();
   switchMediaMode('audio');
 }
 
 function closeFullPlayer() {
   if (fullPlayerModal) {
-    fullPlayerModal.classList.remove('floating-mini-mode');
     fullPlayerModal.classList.add('hidden');
+    fullPlayerModal.style.transform = '';
   }
   document.body.style.overflow = '';
   stopVisualizer();
-  vinylDiscWrap.classList.remove('playing');
+  if (vinylDiscWrap) vinylDiscWrap.classList.remove('playing');
 }
 
 function openDrawer(drawer) {
@@ -3065,7 +3201,7 @@ function setupVideoPlayer() {
     if (ytScrubberProgress) ytScrubberProgress.style.width = `${percent}%`;
 
     // Full Player Seek bar
-    if (fullPlayerModal && !fullPlayerModal.classList.contains('hidden') && !fullPlayerModal.classList.contains('floating-mini-mode')) {
+    if (fullPlayerModal && !fullPlayerModal.classList.contains('hidden')) {
       seekSlider.value = percent;
       seekFill.style.width = `${percent}%`;
       timeCurrent.textContent = formatTime(current);
@@ -3094,23 +3230,9 @@ function setupVideoPlayer() {
     });
   }
 
-  // YouTube Controls Show/Hide on Tap / Hover & Floating Mini Tap
+  // YouTube Controls Show/Hide on Tap / Hover
   if (ytVideoContainer) {
     ytVideoContainer.addEventListener('click', (e) => {
-      // In floating miniplayer mode (Image 3), tap anywhere to expand
-      if (fullPlayerModal && fullPlayerModal.classList.contains('floating-mini-mode')) {
-        if (e.target.closest('#btnFloatingClose')) {
-          closeFloatingVideo();
-          return;
-        }
-        if (e.target.closest('#btnFloatingPlay')) {
-          togglePlay();
-          return;
-        }
-        openFullPlayer();
-        return;
-      }
-
       if (e.target.closest('.yt-icon-btn') || e.target.closest('.yt-media-btn') || e.target.closest('.yt-center-play-btn') || e.target.closest('.yt-tap-seek')) {
         return;
       }
@@ -3266,45 +3388,62 @@ function toggleYtControls() {
 }
 
 function switchMediaMode(targetMode) {
-  if (targetMode === 'video') {
-    const song = state.currentSong;
-    if (song && song.id) {
-      window.location.href = `/watch?v=${encodeURIComponent(song.id)}`;
-    } else {
-      window.location.href = '/watch';
-    }
-    return;
-  }
+  if (state.mediaMode === targetMode) return;
   state.mediaMode = targetMode;
 
   // Sync mode buttons UI
-  if (miniBadgeMp3) miniBadgeMp3.classList.add('active');
-  if (miniBadgeMp4) miniBadgeMp4.classList.remove('active');
-  if (btnFullModeMp3) btnFullModeMp3.classList.add('active');
-  if (btnFullModeMp4) btnFullModeMp4.classList.remove('active');
+  if (miniBadgeMp3) miniBadgeMp3.classList.toggle('active', targetMode === 'audio');
+  if (miniBadgeMp4) miniBadgeMp4.classList.toggle('active', targetMode === 'video');
+  if (btnFullModeMp3) btnFullModeMp3.classList.toggle('active', targetMode === 'audio');
+  if (btnFullModeMp4) btnFullModeMp4.classList.toggle('active', targetMode === 'video');
 
-  // Switch Video -> Audio (MP3)
+  // Sync mode-specific classes on fullPlayerModal (MP4 hides duplicate bottom controls & expands video)
+  if (fullPlayerModal) {
+    fullPlayerModal.classList.toggle('mode-video', targetMode === 'video');
+    fullPlayerModal.classList.toggle('mode-audio', targetMode === 'audio');
+  }
+
   const song = state.currentSong;
-  const currentTime = videoPlayer ? (videoPlayer.currentTime || 0) : (audio.currentTime || 0);
-  const wasPlaying = videoPlayer ? !videoPlayer.paused : state.isPlaying;
-  if (videoPlayer) videoPlayer.pause();
+  if (!song || !song.id) return;
 
-  if (videoStageWrap) videoStageWrap.classList.add('hidden');
-  if (audioStageWrap) audioStageWrap.classList.remove('hidden');
+  if (targetMode === 'video') {
+    // Seamless Switch: Audio (MP3) -> Video (MP4)
+    // Seamlessly preserve currentTime without restarting the video!
+    const currentTime = audio.currentTime || 0;
+    const wasPlaying = !audio.paused;
+    audio.pause();
 
-  if (song) {
+    if (audioStageWrap) audioStageWrap.classList.add('hidden');
+    if (videoStageWrap) videoStageWrap.classList.remove('hidden');
+
+    loadAndPlayVideo(song, currentTime, wasPlaying);
+    openFullPlayer();
+  } else {
+    // Seamless Switch: Video (MP4) -> Audio (MP3)
+    // Seamlessly preserve currentTime without restarting the song!
+    const currentTime = videoPlayer ? (videoPlayer.currentTime || 0) : (audio.currentTime || 0);
+    const wasPlaying = videoPlayer ? !videoPlayer.paused : state.isPlaying;
+    if (videoPlayer) videoPlayer.pause();
+
+    if (videoStageWrap) videoStageWrap.classList.add('hidden');
+    if (audioStageWrap) audioStageWrap.classList.remove('hidden');
+
     if (audio.src && audio.src.includes(song.id)) {
-      audio.currentTime = currentTime;
+      try { audio.currentTime = currentTime; } catch (e) {}
       if (wasPlaying) {
         audio.play().catch(() => {});
       }
     } else {
-      playSongObject(song, false);
-      audio.addEventListener('loadedmetadata', function onLoaded() {
-        audio.currentTime = currentTime;
+      audio.src = `/api/stream/${song.id}`;
+      const playAfterLoad = () => {
+        try { audio.currentTime = currentTime; } catch (e) {}
         if (wasPlaying) audio.play().catch(() => {});
-        audio.removeEventListener('loadedmetadata', onLoaded);
-      }, { once: true });
+      };
+      if (audio.readyState >= 1) {
+        playAfterLoad();
+      } else {
+        audio.addEventListener('loadedmetadata', playAfterLoad, { once: true });
+      }
     }
   }
 }
@@ -3316,24 +3455,37 @@ function loadAndPlayVideo(song, startTime = 0, autoPlay = true) {
   updatePlayPauseUI();
   if (videoSpinner) videoSpinner.classList.remove('hidden');
 
-  videoPlayer.src = `/api/video-stream/${song.id}?quality=${state.videoQuality}`;
-  videoPlayer.playbackRate = state.videoSpeed;
-  videoPlayer.loop = state.videoLoop;
-  videoPlayer.load();
+  const targetSrc = `/api/video-stream/${song.id}?quality=${state.videoQuality}`;
+  const isSameSrc = videoPlayer.src && videoPlayer.src.includes(`/api/video-stream/${song.id}`);
 
-  function onLoadedMetadata() {
-    if (startTime > 0) {
-      videoPlayer.currentTime = startTime;
-    }
-    if (autoPlay) {
-      videoPlayer.play().catch((err) => {
-        console.warn('Video auto-play deferred on mobile:', err.message);
-      });
-    }
-    videoPlayer.removeEventListener('loadedmetadata', onLoadedMetadata);
+  if (!isSameSrc) {
+    videoPlayer.src = targetSrc;
+    videoPlayer.playbackRate = state.videoSpeed;
+    videoPlayer.loop = state.videoLoop;
   }
 
-  videoPlayer.addEventListener('loadedmetadata', onLoadedMetadata);
+  function onReady() {
+    if (startTime > 0) {
+      try {
+        videoPlayer.currentTime = startTime;
+      } catch (e) {}
+    }
+    if (autoPlay) {
+      const playPromise = videoPlayer.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Video auto-play deferred on mobile:', err.message);
+        });
+      }
+    }
+  }
+
+  if (videoPlayer.readyState >= 1) {
+    onReady();
+  } else {
+    videoPlayer.addEventListener('loadedmetadata', onReady, { once: true });
+    videoPlayer.addEventListener('canplay', onReady, { once: true });
+  }
 }
 
 function togglePictureInPicture() {
@@ -3417,7 +3569,10 @@ function setupYtSettings() {
 
       // Update label & badge
       const qualityNames = {
-        auto: 'Auto (720p HD)',
+        auto: 'Auto (1080p HD)',
+        '4k': '4K Ultra HD',
+        '1440p': '1440p 2K QHD',
+        '1080p': '1080p Full HD',
         '720p': '720p HD',
         '480p': '480p',
         '360p': '360p',
